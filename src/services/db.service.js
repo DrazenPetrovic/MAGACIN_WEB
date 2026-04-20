@@ -11,6 +11,8 @@ export const withConnection = async (fn) => {
   try {
     return await fn(connection);
   } finally {
-    await connection.end();
+    if (connection) {
+      await connection.end();
+    }
   }
 };

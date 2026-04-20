@@ -13,6 +13,14 @@ export const login = async (req, res) => {
       });
     }
 
+    if (typeof username !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ success: false, message: 'Neispravni podaci.' });
+    }
+
+    if (username.length > 100 || password.length > 200) {
+      return res.status(400).json({ success: false, message: 'Neispravni podaci.' });
+    }
+
     let result;
     try {
       result = await AuthService.login(username, password);
@@ -61,6 +69,10 @@ export const loginByToken = async (req, res) => {
         success: false,
         message: 'Token je obavezan',
       });
+    }
+
+    if (typeof rfidToken !== 'string' || rfidToken.length > 100) {
+      return res.status(400).json({ success: false, message: 'Neispravni podaci tokena.' });
     }
 
     let result;

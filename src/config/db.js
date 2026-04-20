@@ -1,3 +1,9 @@
+const required = ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
+const missing = required.filter((key) => !process.env[key]);
+if (missing.length > 0) {
+  throw new Error(`Missing required database environment variables: ${missing.join(', ')}`);
+}
+
 export const dbConfig = {
   host: process.env.DB_HOST,
   port: Number(process.env.DB_PORT || 3306),
