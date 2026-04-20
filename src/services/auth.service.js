@@ -20,7 +20,7 @@ export const login = async (username, password) => {
     const vrstaRadnika = row?.sifra_vrste ?? null;
     const nazivRadnika = row?.naziv_radnika ?? username;
 
-    if (!sifraRadnika || sifraRadnika == 0) return { success: false };
+    if (!sifraRadnika || Number(sifraRadnika) === 0) return { success: false };
 
     return {
       success: true,
@@ -39,7 +39,7 @@ export const loginByToken = async (rfidToken) => {
     const vrstaRadnika = row?.sifra_vrste ?? null;
     const username = row?.naziv_radnika ?? null;
 
-    if (!sifraRadnika || sifraRadnika == 0) return { success: false };
+    if (!sifraRadnika || Number(sifraRadnika) === 0) return { success: false };
 
     return {
       success: true,
