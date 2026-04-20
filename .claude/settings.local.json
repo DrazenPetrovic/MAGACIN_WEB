@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//d/WEB_KOMERCIJALA/**)",
+      "Read(//d//**)"
+    ]
+  }
+}
