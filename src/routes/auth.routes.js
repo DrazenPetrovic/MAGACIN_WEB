@@ -12,9 +12,17 @@ const authLimiter = rateLimit({
   message: { success: false, message: 'Previše pokušaja prijave. Pokušajte ponovo za 15 minuta.' },
 });
 
-router.post('/login',        authLimiter, AuthController.login);
-router.post('/token-login',  authLimiter, AuthController.loginByToken);
-router.get('/verify',                     AuthController.verify);
-router.post('/logout',                    AuthController.logout);
+const verifyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Previše zahtjeva.' },
+});
+
+router.post('/login',        authLimiter,   AuthController.login);
+router.post('/token-login',  authLimiter,   AuthController.loginByToken);
+router.get('/verify',        verifyLimiter, AuthController.verify);
+router.post('/logout',                      AuthController.logout);
 
 export default router;

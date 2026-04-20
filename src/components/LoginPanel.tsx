@@ -13,6 +13,11 @@ const PRIMARY = theme.primary;
 const PRIMARY_DARK = '#6a4f8a';
 const SECONDARY = theme.secondary;
 
+// After successful login, show progress animation for this duration before redirecting
+const LOGIN_SUCCESS_DELAY_MS = 5300;
+// RFID tokens are automatically submitted once this many characters are received
+const RFID_TOKEN_MIN_LENGTH = 10;
+
 export function LoginPanel({ onLoginSuccess }: LoginPanelProps) {
   const [tab, setTab] = useState<LoginTab>('token');
   const [loginSuccess, setLoginSuccess] = useState(false);
@@ -37,7 +42,7 @@ export function LoginPanel({ onLoginSuccess }: LoginPanelProps) {
   useEffect(() => {
     if (!loginSuccess) return;
     const startTimer = setTimeout(() => setProgress(100), 50);
-    const doneTimer = setTimeout(() => onLoginSuccess(), 5300);
+    const doneTimer = setTimeout(() => onLoginSuccess(), LOGIN_SUCCESS_DELAY_MS);
     return () => {
       clearTimeout(startTimer);
       clearTimeout(doneTimer);
@@ -98,7 +103,7 @@ export function LoginPanel({ onLoginSuccess }: LoginPanelProps) {
   const handleTokenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setRfidToken(val);
-    if (val.length >= 10) handleTokenSubmit(val);
+    if (val.length >= RFID_TOKEN_MIN_LENGTH) handleTokenSubmit(val);
   };
 
   if (loginSuccess) {
