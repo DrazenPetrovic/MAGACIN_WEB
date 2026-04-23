@@ -1,47 +1,37 @@
-import jwt from 'jsonwebtoken';
-import { env } from '../config/env.js';
-import { withConnection } from './db.service.js';
+import jwt from "jsonwebtoken";
+import { env } from "../config/env.js";
+import { withConnection } from "./db.service.js";
 
 export const login = async (username, password) => {
   return withConnection(async (connection) => {
-    const [rows] = await connection.execute('CALL logovanje_korisnika(?, ?)', [
-      username,
-      password,
-    ]);
-
-    const row = rows?.[0]?.[0] || null;
-    const sifraRadnika = row?.povratna ?? null;
-    const vrstaRadnika = row?.vrsta ?? null;
-
-    if (!sifraRadnika || sifraRadnika === 0) return { success: false };
-
-    const token = jwt.sign(
-      { username, sifraRadnika, vrstaRadnika, loginTime: new Date().toISOString() },
-      env.JWT_SECRET,
-      { expiresIn: '8h' }
+    const [rows] = await connection.execute(
+      "CALL sp_pregled_aktivnih_radnika(?, ?)",
+      [username, password],
     );
 
-    return { success: true, token, user: { username, sifraRadnika, vrstaRadnika } };
-  });
-};
-
-export const loginByToken = async (rfidToken) => {
-  return withConnection(async (connection) => {
-    const [rows] = await connection.execute('CALL logovanje_korisnika_token(?)', [rfidToken]);
-
     const row = rows?.[0]?.[0] || null;
-    const sifraRadnika = row?.povratna ?? null;
-    const vrstaRadnika = row?.vrsta ?? null;
-    const username = row?.naziv ?? null;
 
-    if (!sifraRadnika || sifraRadnika === 0) return { success: false };
+    const sifraRadnika = row?.lozinka ?? null;
+    const vrstaRadnika = row?.vrsta_radnika ?? null;
+
+    if (sifraRadnika == null) return { success: false };
+    if (sifraRadnika == 0) return { success: false };
 
     const token = jwt.sign(
-      { username, sifraRadnika, vrstaRadnika, loginTime: new Date().toISOString() },
+      {
+        username,
+        sifraRadnika,
+        vrstaRadnika,
+        loginTime: new Date().toISOString(),
+      },
       env.JWT_SECRET,
-      { expiresIn: '8h' }
+      { expiresIn: "8h" },
     );
 
-    return { success: true, token, user: { username, sifraRadnika, vrstaRadnika } };
+    return {
+      success: true,
+      token,
+      user: { username, sifraRadnika, vrstaRadnika },
+    };
   });
 };

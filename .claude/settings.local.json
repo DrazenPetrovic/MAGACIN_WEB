@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Read(//d/WEB_KOMERCIJALA/**)",
-      "Read(//d//**)"
+      "Read(//d//**)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)"
     ]
   }
 }

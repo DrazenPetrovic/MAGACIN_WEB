@@ -1,4 +1,6 @@
+import { colors } from './colors';
+
 export const theme = {
-  primary:   '#C47A2B', // glavna boja — narandžasta/ambalaža
-  secondary: '#2B6CB0', // sekundarna boja — plava/magacin
+  primary:   colors.PRIMARY,   // #785E9E
+  secondary: colors.SECONDARY, // #8FC74A
 };

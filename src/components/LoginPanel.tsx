@@ -1,314 +1,203 @@
-import { useState, useRef, useEffect } from "react";
-import { signIn, signInByToken } from "../utils/auth";
-import { CreditCard, User, Lock, CheckCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { signIn } from "../utils/auth";
+import { CheckCircle } from "lucide-react";
 import { theme } from "../theme";
 
 interface LoginPanelProps {
   onLoginSuccess: () => void;
 }
 
-type LoginTab = "credentials" | "token";
-
-const PRIMARY = theme.primary;
-const PRIMARY_DARK = "#9A5E1E";
-const SECONDARY = theme.secondary;
+const primary      = theme.primary;        // #785E9E
+const primaryHover = "#684f8a";
+const primaryPress = "#574176";
+const accent       = theme.secondary;      // #8FC74A
 
 export function LoginPanel({ onLoginSuccess }: LoginPanelProps) {
-  const [tab, setTab] = useState<LoginTab>("token");
-  const [loginSuccess, setLoginSuccess] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [loggedName, setLoggedName] = useState("");
-
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-
-  const [rfidToken, setRfidToken] = useState("");
-  const tokenInputRef = useRef<HTMLInputElement>(null);
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (tab === "token") {
-      setTimeout(() => tokenInputRef.current?.focus(), 50);
-    }
-  }, [tab]);
+  const [loginSuccess, setLoginSuccess] = useState(false);
+  const [loggedName, setLoggedName] = useState("");
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
     if (!loginSuccess) return;
-    const startTimer = setTimeout(() => setProgress(100), 50);
-    const doneTimer = setTimeout(() => onLoginSuccess(), 5300);
-    return () => {
-      clearTimeout(startTimer);
-      clearTimeout(doneTimer);
-    };
+    const t1 = setTimeout(() => setProgress(100), 50);
+    const t2 = setTimeout(() => onLoginSuccess(), 5300);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [loginSuccess, onLoginSuccess]);
 
-  const triggerSuccess = (naziv: string) => {
-    setLoggedName(naziv);
-    setLoading(false);
-    setLoginSuccess(true);
-    setProgress(0);
-  };
-
-  const handleCredentialsLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      const { error: signInError, data } = await signIn(username.trim(), password.trim());
+      const { error: signInError, data } = await signIn(
+        username.trim(),
+        password.trim(),
+      );
       if (signInError) {
         setError(signInError.message || "Pogrešno korisničko ime ili lozinka");
         setLoading(false);
       } else {
-        triggerSuccess(data?.username ?? username);
-      }
-    } catch (err) {
-      setError(`Greška: ${err instanceof Error ? err.message : String(err)}`);
-      setLoading(false);
-    }
-  };
-
-  const handleTokenSubmit = async (tokenValue: string) => {
-    const trimmed = tokenValue.trim();
-    if (!trimmed) return;
-    setError("");
-    setLoading(true);
-    try {
-      const { error: signInError, data } = await signInByToken(trimmed);
-      if (signInError) {
-        setError(signInError.message || "Nepoznat token");
-        setRfidToken("");
+        setLoggedName(data?.username ?? username);
         setLoading(false);
-        setTimeout(() => tokenInputRef.current?.focus(), 50);
-      } else {
-        triggerSuccess(data?.username ?? "");
+        setLoginSuccess(true);
+        setProgress(0);
       }
     } catch (err) {
       setError(`Greška: ${err instanceof Error ? err.message : String(err)}`);
-      setRfidToken("");
       setLoading(false);
     }
   };
 
-  const handleTokenKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") handleTokenSubmit(rfidToken);
-  };
-
-  const handleTokenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setRfidToken(val);
-    if (val.length >= 10) handleTokenSubmit(val);
-  };
-
-  // ─── EKRAN USPJEŠNOG LOGOVANJA ───
+  // ── Ekran uspješnog logovanja ──
   if (loginSuccess) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center p-4"
-        style={{ background: `linear-gradient(135deg, ${PRIMARY}15, ${SECONDARY}15)` }}
-      >
-        <div className="w-full max-w-sm">
+      <div className="min-h-screen login-soft-bg flex items-center justify-center p-6">
+        <div className="w-full max-w-md">
           <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-
-            <div className="px-6 pt-6 pb-5 text-center">
-              <div className="flex justify-center mb-3">
+            <div className="px-8 pt-8 pb-7 text-center">
+              <div className="flex justify-center mb-4">
                 <img
                   src="/foto/karpas_logo_software.png"
                   alt="Karpas Logo"
-                  className="h-20 object-contain"
+                  className="h-24 object-contain"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                 />
               </div>
-
-              <CheckCircle
-                className="w-12 h-12 mx-auto mb-2"
-                style={{ color: SECONDARY }}
-              />
-
-              <p className="text-base font-bold mb-1" style={{ color: PRIMARY }}>
+              <CheckCircle className="w-14 h-14 mx-auto mb-3" style={{ color: accent }} />
+              <p className="text-xl font-bold mb-1" style={{ color: primary }}>
                 Pristup odobren
               </p>
               {loggedName && (
-                <p className="text-sm font-semibold mb-1" style={{ color: SECONDARY }}>
+                <p className="text-base font-semibold mb-1" style={{ color: accent }}>
                   {loggedName}
                 </p>
               )}
-              <p className="text-xs text-gray-400 mb-5">Učitavanje aplikacije...</p>
-
-              <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+              <p className="text-sm text-gray-400 mb-6">Učitavanje aplikacije...</p>
+              <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
                 <div
-                  className="h-2.5 rounded-full"
+                  className="h-3 rounded-full"
                   style={{
                     width: `${progress}%`,
                     transition: "width 5s cubic-bezier(0.4, 0, 0.2, 1)",
-                    background: `linear-gradient(90deg, ${PRIMARY}, ${SECONDARY})`,
+                    background: `linear-gradient(90deg, ${primary}, ${accent})`,
                   }}
                 />
               </div>
             </div>
-
           </div>
         </div>
       </div>
     );
   }
 
-  // ─── FORMA ZA LOGOVANJE ───
+  // ── Forma za logovanje ──
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4"
-      style={{ background: `linear-gradient(135deg, ${PRIMARY}15, ${SECONDARY}15)` }}
-    >
-      <div className="w-full max-w-sm">
-        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-
-          {/* Header — logo */}
-          <div className="px-6 pt-5 pb-4 text-center" style={{ borderBottom: `3px solid ${PRIMARY}` }}>
-            <div className="flex justify-center mb-3">
+    <div className="min-h-screen login-soft-bg flex items-center justify-center p-6">
+      <div className="w-full max-w-md">
+        <div
+          className="bg-white rounded-2xl shadow-2xl p-8 border-2 border-transparent"
+        >
+          {/* Logo */}
+          <div className="flex justify-center mb-7">
+            <div className="w-36 h-36 flex items-center justify-center">
               <img
                 src="/foto/karpas_logo_software.png"
                 alt="Karpas Logo"
-                className="h-20 object-contain"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = "none";
+                  const parent = target.parentElement;
+                  if (parent) {
+                    parent.innerHTML = `<div style="background:${primary}" class="p-6 rounded-full"><svg class="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg></div>`;
+                  }
+                }}
               />
             </div>
-            <h1 className="text-lg font-bold" style={{ color: PRIMARY }}>
-              Magacin — Prijava
-            </h1>
           </div>
 
-          {/* Tabs */}
-          <div className="flex border-b border-gray-200">
-            <button
-              onClick={() => { setTab("credentials"); setError(""); }}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium transition-all ${
-                tab === "credentials" ? "text-white" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-              }`}
-              style={tab === "credentials" ? { backgroundColor: PRIMARY } : {}}
-            >
-              <User className="w-4 h-4" />
-              Korisnik / Šifra
-            </button>
-            <button
-              onClick={() => { setTab("token"); setError(""); setRfidToken(""); }}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium transition-all ${
-                tab === "token" ? "text-white" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-              }`}
-              style={tab === "token" ? { backgroundColor: SECONDARY } : {}}
-            >
-              <CreditCard className="w-4 h-4" />
-              Prijava tokenom
-            </button>
-          </div>
+          <h1 className="text-center text-2xl font-bold text-gray-800 mb-1">
+            Magacin
+          </h1>
+          <p className="text-center text-base mb-8 font-medium" style={{ color: primary }}>
+            Karpas Ambalaže
+          </p>
 
-          <div className="p-5">
-            {/* CREDENTIALS TAB */}
-            {tab === "credentials" && (
-              <form onSubmit={handleCredentialsLogin} autoComplete="on" className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Korisničko ime</label>
-                  <div className="relative">
-                    <User className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      autoComplete="username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      placeholder="Korisničko ime"
-                      className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none transition"
-                      onFocus={(e) => (e.target.style.borderColor = PRIMARY)}
-                      onBlur={(e) => (e.target.style.borderColor = "rgb(209 213 219)")}
-                      required
-                    />
-                  </div>
-                </div>
+          <form onSubmit={handleLogin} autoComplete="on" className="space-y-5">
+            <div>
+              <label
+                htmlFor="username"
+                className="block text-base font-medium text-gray-700 mb-2"
+              >
+                Korisničko ime
+              </label>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Unesite korisničko ime"
+                className="w-full px-5 py-4 text-base border-2 border-gray-300 rounded-xl focus:outline-none transition"
+                style={{ borderColor: "rgb(209 213 219)" }}
+                onFocus={(e) => (e.target.style.borderColor = primary)}
+                onBlur={(e) => (e.target.style.borderColor = "rgb(209 213 219)")}
+                required
+              />
+            </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Lozinka</label>
-                  <div className="relative">
-                    <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="password"
-                      autoComplete="current-password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Lozinka"
-                      className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none transition"
-                      onFocus={(e) => (e.target.style.borderColor = PRIMARY)}
-                      onBlur={(e) => (e.target.style.borderColor = "rgb(209 213 219)")}
-                      required
-                    />
-                  </div>
-                </div>
+            <div>
+              <label
+                htmlFor="password"
+                className="block text-base font-medium text-gray-700 mb-2"
+              >
+                Lozinka
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Unesite lozinku"
+                className="w-full px-5 py-4 text-base border-2 border-gray-300 rounded-xl focus:outline-none transition"
+                style={{ borderColor: "rgb(209 213 219)" }}
+                onFocus={(e) => (e.target.style.borderColor = primary)}
+                onBlur={(e) => (e.target.style.borderColor = "rgb(209 213 219)")}
+                required
+              />
+            </div>
 
-                {error && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
-                    {error}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full text-white font-semibold py-2.5 text-sm rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ backgroundColor: PRIMARY }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = PRIMARY_DARK)}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = PRIMARY)}
-                >
-                  {loading ? "Provjera..." : "Prijava"}
-                </button>
-              </form>
-            )}
-
-            {/* TOKEN TAB */}
-            {tab === "token" && (
-              <div className="space-y-3">
-                <div
-                  className="rounded-xl p-4 text-center border-2 border-dashed"
-                  style={{ borderColor: `${SECONDARY}88`, backgroundColor: `${SECONDARY}10` }}
-                >
-                  <CreditCard className="w-10 h-10 mx-auto mb-2" style={{ color: SECONDARY }} />
-                  <p className="text-xs text-gray-600 font-medium">Prislonite 125kHz token čitaču</p>
-                  <p className="text-xs text-gray-400 mt-0.5">ili unesite kod ručno i pritisnite Enter</p>
-                </div>
-
-                <input
-                  ref={tokenInputRef}
-                  type="text"
-                  value={rfidToken}
-                  onChange={handleTokenChange}
-                  onKeyDown={handleTokenKeyDown}
-                  placeholder="Čeka token..."
-                  disabled={loading}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none text-center tracking-widest font-mono disabled:opacity-50"
-                  onFocus={(e) => (e.target.style.borderColor = SECONDARY)}
-                  onBlur={(e) => (e.target.style.borderColor = "rgb(209 213 219)")}
-                  autoComplete="off"
-                />
-
-                {loading && (
-                  <div className="text-center text-xs text-gray-500">Provjera tokena...</div>
-                )}
-
-                {error && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs text-center">
-                    {error}
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  disabled={loading || !rfidToken.trim()}
-                  onClick={() => handleTokenSubmit(rfidToken)}
-                  className="w-full text-white font-semibold py-2.5 text-sm rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={{ backgroundColor: SECONDARY }}
-                  onMouseEnter={(e) => !loading && rfidToken.trim() && (e.currentTarget.style.backgroundColor = "#1E4F8A")}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = SECONDARY)}
-                >
-                  Prijava tokenom
-                </button>
+            {error && (
+              <div className="bg-red-50 border-2 border-red-200 text-red-700 px-5 py-4 rounded-xl text-base">
+                {error}
               </div>
             )}
-          </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full text-white font-semibold py-4 text-lg rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+              style={{ backgroundColor: primary }}
+              onTouchStart={(e) => (e.currentTarget.style.backgroundColor = primaryPress)}
+              onTouchEnd={(e) => (e.currentTarget.style.backgroundColor = primary)}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = primaryHover)}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = primary)}
+              onMouseDown={(e) => (e.currentTarget.style.backgroundColor = primaryPress)}
+              onMouseUp={(e) => (e.currentTarget.style.backgroundColor = primaryHover)}
+            >
+              {loading ? "Prijava u toku..." : "Prijava"}
+            </button>
+
+            <div className="h-1 w-full rounded-full" style={{ background: accent }} />
+          </form>
         </div>
       </div>
     </div>

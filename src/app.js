@@ -5,6 +5,7 @@ import { env } from './config/env.js';
 
 import healthRoutes from './routes/health.routes.js';
 import authRoutes from './routes/auth.routes.js';
+import aktivneNarudzbeRoutes from './routes/aktivneNarudzbe.routes.js';
 
 export const createApp = () => {
   const app = express();
@@ -18,6 +19,7 @@ export const createApp = () => {
 
   app.use('/api', healthRoutes);
   app.use('/api/auth', authRoutes);
+  app.use('/api/aktivne-narudzbe-teren', aktivneNarudzbeRoutes);
 
   return app;
 };
