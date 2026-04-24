@@ -4,7 +4,10 @@
       "Read(//d/WEB_KOMERCIJALA/**)",
       "Read(//d//**)",
       "Bash(npm install *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://185.99.2.164:3005/api/health)",
+      "Bash(npm run *)",
+      "Bash(npx cap *)"
     ]
   }
 }

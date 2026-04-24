@@ -10,8 +10,21 @@ import aktivneNarudzbeRoutes from './routes/aktivneNarudzbe.routes.js';
 export const createApp = () => {
   const app = express();
 
+  const allowedOrigins = [
+    env.FRONTEND_URL,
+    'https://localhost',
+    'http://localhost',
+    'capacitor://localhost',
+  ];
+
   app.use(cors({
-    origin: env.FRONTEND_URL,
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin ${origin} nije dozvoljen`));
+      }
+    },
     credentials: true,
   }));
   app.use(express.json());
