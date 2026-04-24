@@ -292,7 +292,9 @@ export function AktivneNarudzbe({ onBack }: Props) {
           }
         });
 
-        const finalList = Array.from(kupciMap.values());
+        const finalList = Array.from(kupciMap.values()).sort((a, b) =>
+          (a.naziv_grada ?? '').localeCompare(b.naziv_grada ?? '', 'bs')
+        );
         const initialSpremljeno: Record<string, string> = {};
         const initialSaveStatus: Record<string, 'saving' | 'ok' | 'error'> = {};
         finalList.forEach((kupac) => {
@@ -377,7 +379,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
         else map.set(p.sif, { sif: p.sif, sifra_tabele: p.sifra_tabele, naziv: p.naziv_proizvoda, jm: p.jm, stavke: [stavka] });
       });
     });
-    return Array.from(map.values());
+    return Array.from(map.values()).sort((a, b) => a.naziv.localeCompare(b.naziv, 'bs'));
   })();
 
   // ===== RENDER =====
@@ -592,22 +594,19 @@ export function AktivneNarudzbe({ onBack }: Props) {
 
                             {/* ─── Tabela sa proizvodima ─── */}
                             <div className="overflow-x-auto">
-                              <table className="min-w-full divide-y divide-gray-200">
+                              <table className="w-full table-fixed divide-y divide-gray-200">
                                 <thead style={{ backgroundColor: allFilled ? `${SECONDARY}22` : undefined }}>
                                   <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: allFilled ? SECONDARY : "rgb(107 114 128)" }}>
-                                      ŠIF
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: allFilled ? SECONDARY : "rgb(107 114 128)" }}>
                                       NAZIV PROIZVODA
                                     </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: allFilled ? SECONDARY : "rgb(107 114 128)" }}>
+                                    <th className="px-2 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: allFilled ? SECONDARY : "rgb(107 114 128)", width: 52 }}>
                                       JM
                                     </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: allFilled ? SECONDARY : "rgb(107 114 128)" }}>
+                                    <th className="px-2 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: allFilled ? SECONDARY : "rgb(107 114 128)", width: 96 }}>
                                       KOLIČINA
                                     </th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: allFilled ? SECONDARY : "rgb(107 114 128)" }}>
+                                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: allFilled ? SECONDARY : "rgb(107 114 128)", width: 220 }}>
                                       SPREMLJENO
                                     </th>
                                   </tr>
@@ -615,7 +614,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                 <tbody className="bg-white divide-y divide-gray-200">
                                   {kupac.proizvodi.length === 0 ? (
                                     <tr>
-                                      <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                                      <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
                                         Nema proizvoda
                                       </td>
                                     </tr>
@@ -640,10 +639,6 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                             else inputRefs.current.get(key)?.focus();
                                           }}
                                         >
-                                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 align-top">
-                                            <div>{proizvod.sif}</div>
-                                            {proizvod.sifra_tabele && <div className="text-xs text-gray-400">({proizvod.sifra_tabele})</div>}
-                                          </td>
                                           <td className="px-6 py-4 text-sm text-gray-900 align-top">
                                             <div>{proizvod.naziv_proizvoda}</div>
                                             {proizvod.napomena && proizvod.napomena.trim() && proizvod.napomena.trim() !== "-" && (
@@ -652,10 +647,10 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                               </div>
                                             )}
                                           </td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 align-top">
+                                          <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-900 align-top text-right">
                                             {proizvod.jm}
                                           </td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold align-top" style={{ color: SECONDARY }}>
+                                          <td className="px-2 py-4 whitespace-nowrap text-sm font-semibold align-top text-right" style={{ color: SECONDARY }}>
                                             {proizvod.kolicina}
                                           </td>
                                           <td className="px-4 py-3 align-top" onClick={(e) => e.stopPropagation()}>
@@ -767,12 +762,12 @@ export function AktivneNarudzbe({ onBack }: Props) {
 
                               {/* Tabela kupaca */}
                               <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
+                                <table className="w-full table-fixed divide-y divide-gray-200">
                                   <thead style={{ backgroundColor: allFilledP ? `${SECONDARY}22` : undefined }}>
                                     <tr>
                                       <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: allFilledP ? SECONDARY : "rgb(107 114 128)" }}>KUPAC</th>
-                                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: allFilledP ? SECONDARY : "rgb(107 114 128)" }}>KOLIČINA</th>
-                                      <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: allFilledP ? SECONDARY : "rgb(107 114 128)" }}>SPREMLJENO</th>
+                                      <th className="px-2 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: allFilledP ? SECONDARY : "rgb(107 114 128)", width: 96 }}>KOLIČINA</th>
+                                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: allFilledP ? SECONDARY : "rgb(107 114 128)", width: 220 }}>SPREMLJENO</th>
                                     </tr>
                                   </thead>
                                   <tbody className="bg-white divide-y divide-gray-200">
@@ -806,7 +801,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                               <div className="mt-1 text-xs italic" style={{ color: SECONDARY }}>{stavka.napomena.trim()}</div>
                                             )}
                                           </td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold align-top" style={{ color: SECONDARY }}>
+                                          <td className="px-2 py-4 whitespace-nowrap text-sm font-semibold align-top text-right" style={{ color: SECONDARY }}>
                                             {stavka.kolicina}
                                           </td>
                                           <td className="px-4 py-3 align-top" onClick={(e) => e.stopPropagation()}>

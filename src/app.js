@@ -15,6 +15,7 @@ export const createApp = () => {
     'https://localhost',
     'http://localhost',
     'capacitor://localhost',
+    'http://localhost:5173',
   ];
 
   app.use(cors({

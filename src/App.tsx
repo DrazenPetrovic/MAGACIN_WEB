@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { LoginPanel } from './components/LoginPanel';
 import { Dashboard } from './components/Dashboard';
 import { AktivneNarudzbe } from './components/AktivneNarudzbe';
-import { verifyAuth, signOut } from './utils/auth';
+import { verifyAuth, getCurrentUser, signOut } from './utils/auth';
 
 type Screen = 'dashboard' | 'aktivne-narudzbe';
 
@@ -26,8 +26,8 @@ function App() {
     checkAuth();
   }, []);
 
-  const handleLoginSuccess = async () => {
-    const user = await verifyAuth();
+  const handleLoginSuccess = () => {
+    const user = getCurrentUser();
     if (user) {
       setUsername(user.username);
       setVrstaRadnika(user.vrstaRadnika);

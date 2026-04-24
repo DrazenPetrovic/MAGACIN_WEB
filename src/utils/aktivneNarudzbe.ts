@@ -33,28 +33,43 @@ const opts = { credentials: "include" as RequestCredentials };
 export const fetchTereniPoDanima = async (): Promise<TerenData[]> => {
   const res = await fetch(`${API_URL}/api/aktivne-narudzbe-teren/tereni`, opts);
   const data = await res.json();
-  if (!res.ok || !data.success) throw new Error(data.message || "Greška pri dohvatanju terena");
+  if (!res.ok || !data.success)
+    throw new Error(data.message || "Greška pri dohvatanju terena");
   return data.data;
 };
 
-export const fetchAktivneNarudzbe = async (sifraTerena: number): Promise<NarudzbaStavka[]> => {
-  const res = await fetch(`${API_URL}/api/aktivne-narudzbe-teren/${sifraTerena}`, opts);
+export const fetchAktivneNarudzbe = async (
+  sifraTerena: number,
+): Promise<NarudzbaStavka[]> => {
+  const res = await fetch(
+    `${API_URL}/api/aktivne-narudzbe-teren/${sifraTerena}`,
+    opts,
+  );
   const data = await res.json();
-  if (!res.ok || !data.success) throw new Error(data.message || "Greška pri dohvatanju narudžbi");
+  if (!res.ok || !data.success)
+    throw new Error(data.message || "Greška pri dohvatanju narudžbi");
   return data.data;
 };
 
-export const fetchAktivneNarudzbeGrupisano = async (sifraTerena: number): Promise<NarudzbaGrupisano[]> => {
-  const res = await fetch(`${API_URL}/api/aktivne-narudzbe-teren/${sifraTerena}/grupisano`, opts);
+export const fetchAktivneNarudzbeGrupisano = async (
+  sifraTerena: number,
+): Promise<NarudzbaGrupisano[]> => {
+  const res = await fetch(
+    `${API_URL}/api/aktivne-narudzbe-teren/${sifraTerena}/grupisano`,
+    opts,
+  );
   const data = await res.json();
-  if (!res.ok || !data.success) throw new Error(data.message || "Greška pri dohvatanju grupiranih narudžbi");
+  if (!res.ok || !data.success)
+    throw new Error(
+      data.message || "Greška pri dohvatanju grupiranih narudžbi",
+    );
   return data.data;
 };
 
 // Placeholder — dodati kad service bude spreman
 export const savePripremljeneKolicine = async (
   _sifraTerena: number,
-  _stavke: { sif: string; sifra_kupca: number; pripremljenoKg: number }[]
+  _stavke: { sif: string; sifra_kupca: number; pripremljenoKg: number }[],
 ): Promise<void> => {
   void headers;
   throw new Error("savePripremljeneKolicine — service još nije implementiran");

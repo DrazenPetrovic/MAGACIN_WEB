@@ -100,11 +100,11 @@ export function LoginPanel({ onLoginSuccess }: LoginPanelProps) {
     <div className="min-h-screen login-soft-bg flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         <div
-          className="bg-white rounded-2xl shadow-2xl p-8 border-2 border-transparent"
+          className="bg-white rounded-2xl shadow-2xl px-8 py-5 border-2 border-transparent"
         >
           {/* Logo */}
-          <div className="flex justify-center mb-7">
-            <div className="w-36 h-36 flex items-center justify-center">
+          <div className="flex justify-center mb-3">
+            <div className="w-24 h-24 flex items-center justify-center">
               <img
                 src="/foto/karpas_logo_software.png"
                 alt="Karpas Logo"
@@ -124,15 +124,15 @@ export function LoginPanel({ onLoginSuccess }: LoginPanelProps) {
           <h1 className="text-center text-2xl font-bold text-gray-800 mb-1">
             Magacin
           </h1>
-          <p className="text-center text-base mb-8 font-medium" style={{ color: primary }}>
+          <p className="text-center text-base mb-4 font-medium" style={{ color: primary }}>
             Karpas Ambalaže
           </p>
 
-          <form onSubmit={handleLogin} autoComplete="on" className="space-y-5">
+          <form onSubmit={handleLogin} autoComplete="on" className="space-y-3">
             <div>
               <label
                 htmlFor="username"
-                className="block text-base font-medium text-gray-700 mb-2"
+                className="block text-base font-medium text-gray-700 mb-1"
               >
                 Korisničko ime
               </label>
@@ -144,7 +144,7 @@ export function LoginPanel({ onLoginSuccess }: LoginPanelProps) {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Unesite korisničko ime"
-                className="w-full px-5 py-4 text-base border-2 border-gray-300 rounded-xl focus:outline-none transition"
+                className="w-full px-5 py-3 text-base border-2 border-gray-300 rounded-xl focus:outline-none transition"
                 style={{ borderColor: "rgb(209 213 219)" }}
                 onFocus={(e) => (e.target.style.borderColor = primary)}
                 onBlur={(e) => (e.target.style.borderColor = "rgb(209 213 219)")}
@@ -155,7 +155,7 @@ export function LoginPanel({ onLoginSuccess }: LoginPanelProps) {
             <div>
               <label
                 htmlFor="password"
-                className="block text-base font-medium text-gray-700 mb-2"
+                className="block text-base font-medium text-gray-700 mb-1"
               >
                 Lozinka
               </label>
@@ -167,7 +167,7 @@ export function LoginPanel({ onLoginSuccess }: LoginPanelProps) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Unesite lozinku"
-                className="w-full px-5 py-4 text-base border-2 border-gray-300 rounded-xl focus:outline-none transition"
+                className="w-full px-5 py-3 text-base border-2 border-gray-300 rounded-xl focus:outline-none transition"
                 style={{ borderColor: "rgb(209 213 219)" }}
                 onFocus={(e) => (e.target.style.borderColor = primary)}
                 onBlur={(e) => (e.target.style.borderColor = "rgb(209 213 219)")}
@@ -184,7 +184,7 @@ export function LoginPanel({ onLoginSuccess }: LoginPanelProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full text-white font-semibold py-4 text-lg rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+              className="w-full text-white font-semibold py-3 text-lg rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
               style={{ backgroundColor: primary }}
               onTouchStart={(e) => (e.currentTarget.style.backgroundColor = primaryPress)}
               onTouchEnd={(e) => (e.currentTarget.style.backgroundColor = primary)}
