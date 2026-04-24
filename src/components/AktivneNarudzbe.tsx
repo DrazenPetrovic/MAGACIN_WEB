@@ -1,8 +1,18 @@
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Loader, ChevronDown, ChevronUp, Mic, MessageSquare, X, CheckCircle2, XCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  Loader,
+  ChevronDown,
+  ChevronUp,
+  Mic,
+  MessageSquare,
+  X,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 import { theme } from "../theme";
 
-const PRIMARY   = theme.primary;   // #785E9E
+const PRIMARY = theme.primary; // #785E9E
 const SECONDARY = theme.secondary; // #8FC74A
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3005";
@@ -24,8 +34,15 @@ interface NarudzbaKupac {
   sifra_kupca: number;
   naziv_kupca: string;
   naziv_grada?: string;
+  sifra_grada?: number;
   referentni_broj?: string;
   proizvodi: NarudzbaProizvod[];
+}
+
+interface RedosljedGrada {
+  sifra_terena: number;
+  sifra_grada: number;
+  sinhronizovano: number;
 }
 
 interface TerenoData {
@@ -41,6 +58,7 @@ interface DayOption {
   sifraTerena: number;
   day: string;
   date: string;
+  rawDate: string;
 }
 
 // ===== HELPERS (identično kao KOMERCIJALA) =====
@@ -60,7 +78,10 @@ const normalizeReferentniBroj = (value?: string | null): string => {
   return normalized;
 };
 
-const getKupacGroupingKey = (sifraKupca: number, referentniBroj?: string | null): string => {
+const getKupacGroupingKey = (
+  sifraKupca: number,
+  referentniBroj?: string | null,
+): string => {
   const norm = normalizeReferentniBroj(referentniBroj);
   return norm ? `${sifraKupca}::${norm}` : String(sifraKupca);
 };
@@ -74,23 +95,36 @@ interface Props {
 // ===== KOMPONENTA =====
 
 export function AktivneNarudzbe({ onBack }: Props) {
-  const [tereniData, setTereniData]           = useState<TerenoData[]>([]);
-  const [loading, setLoading]                 = useState(true);
-  const [selectedDay, setSelectedDay]         = useState<number | null>(null);
-  const [selectedTerenaSifra, setSelectedTerenaSifra] = useState<number | null>(null);
+  const [tereniData, setTereniData] = useState<TerenoData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [selectedTerenaSifra, setSelectedTerenaSifra] = useState<number | null>(
+    null,
+  );
   const [narudzbePoKupcu, setNarudzbePoKupcu] = useState<NarudzbaKupac[]>([]);
   const [loadingNarudzbe, setLoadingNarudzbe] = useState(false);
+  const [redosljedGradova, setRedosljedGradova] = useState<RedosljedGrada[]>(
+    [],
+  );
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
-  const [viewMode, setViewMode] = useState<'po-kupcu' | 'po-proizvodu'>('po-kupcu');
+  const [viewMode, setViewMode] = useState<"po-kupcu" | "po-proizvodu">(
+    "po-kupcu",
+  );
 
   // ─── Spremljene količine ───────────────────────────────────────────────────
-  const [spremljeno, setSpremljeno]   = useState<Record<string, string>>({});
-  const [napomenaOp, setNapomenaOp]   = useState<Record<string, string>>({});
-  const [saveStatus, setSaveStatus]   = useState<Record<string, 'saving' | 'ok' | 'error'>>({});
-  const [voiceKey, setVoiceKey]         = useState<string | null>(null);
+  const [spremljeno, setSpremljeno] = useState<Record<string, string>>({});
+  const [napomenaOp, setNapomenaOp] = useState<Record<string, string>>({});
+  const [saveStatus, setSaveStatus] = useState<
+    Record<string, "saving" | "ok" | "error">
+  >({});
+  const [voiceKey, setVoiceKey] = useState<string | null>(null);
   const [voiceNoteKey, setVoiceNoteKey] = useState<string | null>(null);
-  const [noteModal, setNoteModal]       = useState<{ key: string; title: string; sifra_tabele?: number } | null>(null);
-  const [confirmKey, setConfirmKey]   = useState<string | null>(null);
+  const [noteModal, setNoteModal] = useState<{
+    key: string;
+    title: string;
+    sifra_tabele?: number;
+  } | null>(null);
+  const [confirmKey, setConfirmKey] = useState<string | null>(null);
   const inputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map());
 
   const rowKey = (kupacKey: string, sif: string, idx: number) =>
@@ -103,8 +137,13 @@ export function AktivneNarudzbe({ onBack }: Props) {
 
   const startVoice = (key: string) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { alert("Preglednik ne podržava glasovni unos."); return; }
+    const SR =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+    if (!SR) {
+      alert("Preglednik ne podržava glasovni unos.");
+      return;
+    }
     const rec = new SR();
     rec.lang = "bs-BA";
     rec.continuous = false;
@@ -119,14 +158,19 @@ export function AktivneNarudzbe({ onBack }: Props) {
       setTimeout(() => inputRefs.current.get(key)?.focus(), 50);
     };
     rec.onerror = () => setVoiceKey(null);
-    rec.onend   = () => setVoiceKey(null);
+    rec.onend = () => setVoiceKey(null);
     rec.start();
   };
 
   const startVoiceNote = (key: string) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { alert("Preglednik ne podržava glasovni unos."); return; }
+    const SR =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+    if (!SR) {
+      alert("Preglednik ne podržava glasovni unos.");
+      return;
+    }
     const rec = new SR();
     rec.lang = "bs-BA";
     rec.continuous = false;
@@ -139,27 +183,38 @@ export function AktivneNarudzbe({ onBack }: Props) {
       setVoiceNoteKey(null);
     };
     rec.onerror = () => setVoiceNoteKey(null);
-    rec.onend   = () => setVoiceNoteKey(null);
+    rec.onend = () => setVoiceNoteKey(null);
     rec.start();
   };
 
-  const handleSpremljenoBlur = async (key: string, sifraTabele: number | undefined, napomena: string | undefined) => {
+  const handleSpremljenoBlur = async (
+    key: string,
+    sifraTabele: number | undefined,
+    napomena: string | undefined,
+  ) => {
     const val = spremljeno[key];
     if (!val || val === "-1.000" || !sifraTabele) return;
     const kolicina = parseFloat(val.replace(",", "."));
     if (isNaN(kolicina)) return;
-    setSaveStatus(p => ({ ...p, [key]: 'saving' }));
+    setSaveStatus((p) => ({ ...p, [key]: "saving" }));
     try {
-      const res = await fetch(`${API_URL}/api/aktivne-narudzbe-teren/azuriraj`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ sifraPolja: sifraTabele, kolicinaZaUnos: kolicina, napomena: napomena || null }),
-      });
+      const res = await fetch(
+        `${API_URL}/api/aktivne-narudzbe-teren/azuriraj`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            sifraPolja: sifraTabele,
+            kolicinaZaUnos: kolicina,
+            napomena: napomena || null,
+          }),
+        },
+      );
       const data = await res.json();
-      setSaveStatus(p => ({ ...p, [key]: data.success ? 'ok' : 'error' }));
+      setSaveStatus((p) => ({ ...p, [key]: data.success ? "ok" : "error" }));
     } catch {
-      setSaveStatus(p => ({ ...p, [key]: 'error' }));
+      setSaveStatus((p) => ({ ...p, [key]: "error" }));
     }
   };
 
@@ -167,11 +222,20 @@ export function AktivneNarudzbe({ onBack }: Props) {
   const fetchTerenPoDanima = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/aktivne-narudzbe-teren/tereni`, {
+      const fetchOpts = {
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
+        credentials: "include" as RequestCredentials,
+      };
+      const [response, redosljedRes] = await Promise.all([
+        fetch(`${API_URL}/api/aktivne-narudzbe-teren/tereni`, fetchOpts),
+        fetch(
+          `${API_URL}/api/aktivne-narudzbe-teren/redosljed-gradova`,
+          fetchOpts,
+        ),
+      ]);
       if (!response.ok) throw new Error(`API error: ${response.status}`);
+      const redosljedData = await redosljedRes.json();
+      if (redosljedData.success) setRedosljedGradova(redosljedData.data);
       const result = await response.json();
 
       if (result.success && result.data) {
@@ -209,10 +273,13 @@ export function AktivneNarudzbe({ onBack }: Props) {
       setNarudzbePoKupcu([]);
 
       const [grupisaneResponse, aktivneResponse] = await Promise.all([
-        fetch(`${API_URL}/api/aktivne-narudzbe-teren/${sifraTerenaDostava}/grupisano`, {
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-        }),
+        fetch(
+          `${API_URL}/api/aktivne-narudzbe-teren/${sifraTerenaDostava}/grupisano`,
+          {
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+          },
+        ),
         fetch(`${API_URL}/api/aktivne-narudzbe-teren/${sifraTerenaDostava}`, {
           headers: { "Content-Type": "application/json" },
           credentials: "include",
@@ -225,85 +292,105 @@ export function AktivneNarudzbe({ onBack }: Props) {
       }
 
       const grupisaneResult = await grupisaneResponse.json();
-      const aktivneResult   = await aktivneResponse.json();
+      const aktivneResult = await aktivneResponse.json();
 
       if (grupisaneResult.success && aktivneResult.success) {
         const grupisaneData = grupisaneResult.data || [];
-        const aktivneData   = aktivneResult.data   || [];
+        const aktivneData = aktivneResult.data || [];
 
         // ─── Grupisanje po kupcu + referentnom broju (identično KOMERCIJALA) ───
         const kupciMap = new Map<string, NarudzbaKupac>();
 
-        grupisaneData.forEach((item: {
-          sifra_partnera: number;
-          naziv_partnera: string;
-          partnera: string;
-          naziv_grada?: string;
-          referentni_broj: string;
-        }) => {
-          const referentniBroj = normalizeReferentniBroj(item.referentni_broj);
-          const kupacKey = getKupacGroupingKey(item.sifra_partnera, referentniBroj);
-          if (!kupciMap.has(kupacKey)) {
-            kupciMap.set(kupacKey, {
-              sifra_kupca: item.sifra_partnera,
-              naziv_kupca: item.naziv_partnera || item.partnera || "Nepoznat kupac",
-              naziv_grada: item.naziv_grada,
-              referentni_broj: referentniBroj,
-              proizvodi: [],
-            });
-          }
-        });
-
-        aktivneData.forEach((item: {
-          sifra_patnera: number;
-          sifra_partnera: number;
-          sifra_proizvoda: string;
-          sifra_tabele?: number;
-          naziv_proizvoda: string;
-          jm: string;
-          kolicina_proizvoda: number;
-          napomena: string;
-          spremljena_kolicina?: number;
-          referentni_broj?: string;
-        }) => {
-          const sifraKupca = item.sifra_patnera || item.sifra_partnera;
-          const referentniBroj = normalizeReferentniBroj(item.referentni_broj);
-          const kupacKey = getKupacGroupingKey(sifraKupca, referentniBroj);
-
-          let kupac = kupciMap.get(kupacKey);
-          if (!kupac) {
-            kupac = kupciMap.get(String(sifraKupca));
-          }
-
-          if (kupac) {
-            if (!kupac.referentni_broj && referentniBroj) {
-              kupac.referentni_broj = referentniBroj;
+        grupisaneData.forEach(
+          (item: {
+            sifra_partnera: number;
+            naziv_partnera: string;
+            partnera: string;
+            naziv_grada?: string;
+            sifra_grada?: number;
+            referentni_broj: string;
+          }) => {
+            const referentniBroj = normalizeReferentniBroj(
+              item.referentni_broj,
+            );
+            const kupacKey = getKupacGroupingKey(
+              item.sifra_partnera,
+              referentniBroj,
+            );
+            if (!kupciMap.has(kupacKey)) {
+              kupciMap.set(kupacKey, {
+                sifra_kupca: item.sifra_partnera,
+                naziv_kupca:
+                  item.naziv_partnera || item.partnera || "Nepoznat kupac",
+                naziv_grada: item.naziv_grada,
+                sifra_grada: item.sifra_grada,
+                referentni_broj: referentniBroj,
+                proizvodi: [],
+              });
             }
-            kupac.proizvodi.push({
-              sif: item.sifra_proizvoda,
-              sifra_tabele: item.sifra_tabele,
-              naziv_proizvoda: item.naziv_proizvoda,
-              jm: item.jm,
-              kolicina: item.kolicina_proizvoda,
-              napomena: item.napomena || " ",
-              spremljena_kolicina: item.spremljena_kolicina,
-              sifra_kupca: sifraKupca,
-            });
-          }
-        });
-
-        const finalList = Array.from(kupciMap.values()).sort((a, b) =>
-          (a.naziv_grada ?? '').localeCompare(b.naziv_grada ?? '', 'bs')
+          },
         );
+
+        aktivneData.forEach(
+          (item: {
+            sifra_patnera: number;
+            sifra_partnera: number;
+            sifra_proizvoda: string;
+            sifra_tabele?: number;
+            naziv_proizvoda: string;
+            jm: string;
+            kolicina_proizvoda: number;
+            napomena: string;
+            spremljena_kolicina?: number;
+            referentni_broj?: string;
+          }) => {
+            const sifraKupca = item.sifra_patnera || item.sifra_partnera;
+            const referentniBroj = normalizeReferentniBroj(
+              item.referentni_broj,
+            );
+            const kupacKey = getKupacGroupingKey(sifraKupca, referentniBroj);
+
+            let kupac = kupciMap.get(kupacKey);
+            if (!kupac) {
+              kupac = kupciMap.get(String(sifraKupca));
+            }
+
+            if (kupac) {
+              if (!kupac.referentni_broj && referentniBroj) {
+                kupac.referentni_broj = referentniBroj;
+              }
+              kupac.proizvodi.push({
+                sif: item.sifra_proizvoda,
+                sifra_tabele: item.sifra_tabele,
+                naziv_proizvoda: item.naziv_proizvoda,
+                jm: item.jm,
+                kolicina: item.kolicina_proizvoda,
+                napomena: item.napomena || " ",
+                spremljena_kolicina: item.spremljena_kolicina,
+                sifra_kupca: sifraKupca,
+              });
+            }
+          },
+        );
+
+        const finalList = Array.from(kupciMap.values());
         const initialSpremljeno: Record<string, string> = {};
-        const initialSaveStatus: Record<string, 'saving' | 'ok' | 'error'> = {};
+        const initialSaveStatus: Record<string, "saving" | "ok" | "error"> = {};
         finalList.forEach((kupac) => {
           kupac.proizvodi.forEach((proizvod, idx) => {
-            const k = rowKey(getKupacGroupingKey(kupac.sifra_kupca, kupac.referentni_broj), proizvod.sif, idx);
+            const k = rowKey(
+              getKupacGroupingKey(kupac.sifra_kupca, kupac.referentni_broj),
+              proizvod.sif,
+              idx,
+            );
             const sk = proizvod.spremljena_kolicina;
-            if (sk !== undefined && sk !== null && parseFloat(String(sk)) !== -1) {
+            if (
+              sk !== undefined &&
+              sk !== null &&
+              parseFloat(String(sk)) !== -1
+            ) {
               initialSpremljeno[k] = String(sk);
-              initialSaveStatus[k] = 'ok';
+              initialSaveStatus[k] = "ok";
             } else {
               initialSpremljeno[k] = "-1.000";
             }
@@ -342,44 +429,117 @@ export function AktivneNarudzbe({ onBack }: Props) {
           sifraTerena: t.sifra_terena,
           day: t.naziv_dana,
           date: formatDate(t.datum_dostave),
+          rawDate: t.datum_dostave,
         },
-      ])
-    ).values()
+      ]),
+    ).values(),
   ).sort((a, b) => a.sifraTerenaDostava - b.sifraTerenaDostava);
 
-  const trenutniTeren = tereniData.find(t => t.sifra_terena_dostava === selectedDay);
-  const nazivDana   = trenutniTeren?.naziv_dana ?? "";
-  const datumDostave = trenutniTeren ? formatDate(trenutniTeren.datum_dostave) : "";
+  const trenutniTeren = tereniData.find(
+    (t) => t.sifra_terena_dostava === selectedDay,
+  );
+  const nazivDana = trenutniTeren?.naziv_dana ?? "";
+  const datumDostave = trenutniTeren
+    ? formatDate(trenutniTeren.datum_dostave)
+    : "";
 
-  // Varijable sačuvane za kasniju upotrebu (lijevi panel)
-  void loading; void selectedTerenaSifra;
-  void uniqueDays; void handleDayClick;
+  void loading;
+
+  const [dayDropdownOpen, setDayDropdownOpen] = useState(false);
+
+  const toLocalDateStr = (raw: string) => {
+    const d = new Date(raw);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  const sortedNarudzbePoKupcu = [...narudzbePoKupcu].sort((a, b) => {
+    const rA =
+      redosljedGradova.find(
+        (r) =>
+          r.sifra_terena === selectedTerenaSifra &&
+          r.sifra_grada === a.sifra_grada,
+      )?.sinhronizovano ?? 9999;
+    const rB =
+      redosljedGradova.find(
+        (r) =>
+          r.sifra_terena === selectedTerenaSifra &&
+          r.sifra_grada === b.sifra_grada,
+      )?.sinhronizovano ?? 9999;
+    return rA - rB;
+  });
 
   // ─── Brojač spremljenih ────────────────────────────────────────────────────
-  const totalProizvoda = narudzbePoKupcu.reduce((s, k) => s + k.proizvodi.length, 0);
-  const spremljenoCount = narudzbePoKupcu.reduce((s, kupac) =>
-    s + kupac.proizvodi.filter((p, idx) => {
-      const k = rowKey(getKupacGroupingKey(kupac.sifra_kupca, kupac.referentni_broj), p.sif, idx);
-      return saveStatus[k] === 'ok';
-    }).length, 0
+  const totalProizvoda = narudzbePoKupcu.reduce(
+    (s, k) => s + k.proizvodi.length,
+    0,
+  );
+  const spremljenoCount = narudzbePoKupcu.reduce(
+    (s, kupac) =>
+      s +
+      kupac.proizvodi.filter((p, idx) => {
+        const k = rowKey(
+          getKupacGroupingKey(kupac.sifra_kupca, kupac.referentni_broj),
+          p.sif,
+          idx,
+        );
+        return saveStatus[k] === "ok";
+      }).length,
+    0,
   );
 
   // ─── PO PROIZVODU — grupisanje ────────────────────────────────────────────
   const proizvodiPoNazivu = (() => {
-    const map = new Map<string, {
-      sif: string; sifra_tabele?: number; naziv: string; jm: string;
-      stavke: { sifraKupca: number; nazivKupca: string; nazivGrada?: string; sifra_tabele?: number; kolicina: number; napomena?: string; key: string }[];
-    }>();
+    const map = new Map<
+      string,
+      {
+        sif: string;
+        sifra_tabele?: number;
+        naziv: string;
+        jm: string;
+        stavke: {
+          sifraKupca: number;
+          nazivKupca: string;
+          nazivGrada?: string;
+          sifra_tabele?: number;
+          kolicina: number;
+          napomena?: string;
+          key: string;
+        }[];
+      }
+    >();
     narudzbePoKupcu.forEach((kupac) => {
       kupac.proizvodi.forEach((p, idx) => {
-        const k = rowKey(getKupacGroupingKey(kupac.sifra_kupca, kupac.referentni_broj), p.sif, idx);
+        const k = rowKey(
+          getKupacGroupingKey(kupac.sifra_kupca, kupac.referentni_broj),
+          p.sif,
+          idx,
+        );
         const existing = map.get(p.sif);
-        const stavka = { sifraKupca: kupac.sifra_kupca, nazivKupca: kupac.naziv_kupca, nazivGrada: kupac.naziv_grada, sifra_tabele: p.sifra_tabele, kolicina: p.kolicina, napomena: p.napomena, key: k };
+        const stavka = {
+          sifraKupca: kupac.sifra_kupca,
+          nazivKupca: kupac.naziv_kupca,
+          nazivGrada: kupac.naziv_grada,
+          sifra_tabele: p.sifra_tabele,
+          kolicina: p.kolicina,
+          napomena: p.napomena,
+          key: k,
+        };
         if (existing) existing.stavke.push(stavka);
-        else map.set(p.sif, { sif: p.sif, sifra_tabele: p.sifra_tabele, naziv: p.naziv_proizvoda, jm: p.jm, stavke: [stavka] });
+        else
+          map.set(p.sif, {
+            sif: p.sif,
+            sifra_tabele: p.sifra_tabele,
+            naziv: p.naziv_proizvoda,
+            jm: p.jm,
+            stavke: [stavka],
+          });
       });
     });
-    return Array.from(map.values()).sort((a, b) => a.naziv.localeCompare(b.naziv, 'bs'));
+    return Array.from(map.values()).sort((a, b) =>
+      a.naziv.localeCompare(b.naziv, "bs"),
+    );
   })();
 
   // ===== RENDER =====
@@ -391,27 +551,12 @@ export function AktivneNarudzbe({ onBack }: Props) {
       {/* ─── Outer card wrapper (identično KOMERCIJALA) ─────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden m-0 md:m-3">
         <div className="bg-white rounded-none md:rounded-2xl shadow-xl overflow-hidden flex flex-col h-full">
-
           {/* ─── HEADER — KOLAPSIBILAN (identično KOMERCIJALA) ──────────────── */}
           <div
             className={`border-b-2 border-gray-200 bg-white transition-all duration-300 relative flex-none ${
               headerCollapsed ? "max-h-8" : "max-h-24"
             }`}
           >
-            {/* Strelica za kolaps */}
-            <div className="absolute top-1 left-3 z-20">
-              <button
-                onClick={() => setHeaderCollapsed(!headerCollapsed)}
-                className="p-1 hover:bg-gray-100 rounded-lg transition-all"
-                title={headerCollapsed ? "Proširi header" : "Smanji header"}
-              >
-                {headerCollapsed
-                  ? <ChevronDown className="w-4 h-4 text-gray-600" />
-                  : <ChevronUp className="w-4 h-4 text-gray-600" />
-                }
-              </button>
-            </div>
-
             <div className="flex items-center justify-between gap-3 px-6 md:px-8 py-2 md:py-4">
               {!headerCollapsed && (
                 <>
@@ -420,30 +565,100 @@ export function AktivneNarudzbe({ onBack }: Props) {
                       onClick={onBack}
                       className="flex items-center justify-center w-8 h-8 rounded-lg border-2 transition-all active:scale-95"
                       style={{ color: PRIMARY, borderColor: PRIMARY }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = `${PRIMARY}10`)}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.backgroundColor = `${PRIMARY}10`)
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.backgroundColor = "transparent")
+                      }
                     >
                       <ArrowLeft className="w-4 h-4" />
                     </button>
-                    <h2 className="text-base md:text-lg font-bold" style={{ color: PRIMARY }}>
-                      {nazivDana || "Aktivne narudžbe"}
-                      {datumDostave && (
-                        <span className="ml-2 text-sm font-normal text-gray-500">{datumDostave}</span>
+                    <div className="relative">
+                      <button
+                        onClick={() => setDayDropdownOpen((o) => !o)}
+                        className="flex items-center gap-2 rounded-lg px-2 py-1 transition-all hover:bg-gray-100 active:bg-gray-200"
+                      >
+                        <span className="text-base md:text-lg font-bold" style={{ color: PRIMARY }}>
+                          {nazivDana || "Aktivne narudžbe"}
+                        </span>
+                        {datumDostave && (
+                          <span className="text-sm font-normal text-gray-500">{datumDostave}</span>
+                        )}
+                        <ChevronDown
+                          className="w-4 h-4 transition-transform"
+                          style={{ color: PRIMARY, transform: dayDropdownOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+                        />
+                      </button>
+
+                      {dayDropdownOpen && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-20"
+                            onClick={() => setDayDropdownOpen(false)}
+                          />
+                          <div className="absolute left-0 top-full mt-1 z-30 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden min-w-52">
+                            {uniqueDays.filter((d) => {
+                              const dStr = d.rawDate ? toLocalDateStr(d.rawDate) : '';
+                              return dStr >= todayStr;
+                            }).map((d) => {
+                              const dStr = d.rawDate ? toLocalDateStr(d.rawDate) : '';
+                              const isAfterToday = dStr > todayStr;
+                              const isSelected = selectedDay === d.sifraTerenaDostava;
+                              return (
+                                <button
+                                  key={d.sifraTerenaDostava}
+                                  onClick={() => { handleDayClick(d); setDayDropdownOpen(false); }}
+                                  className="w-full text-left px-4 py-3 flex items-center justify-between gap-4 transition-colors hover:bg-gray-50 active:bg-gray-100"
+                                  style={{
+                                    backgroundColor: isSelected ? `${PRIMARY}12` : undefined,
+                                    borderLeft: isSelected ? `3px solid ${PRIMARY}` : "3px solid transparent",
+                                  }}
+                                >
+                                  <span
+                                    className="font-semibold text-sm"
+                                    style={{ color: isAfterToday ? "rgb(156 163 175)" : isSelected ? PRIMARY : "rgb(55 65 81)" }}
+                                  >
+                                    {d.day}
+                                  </span>
+                                  <span
+                                    className="text-xs"
+                                    style={{ color: isAfterToday ? "rgb(209 213 219)" : "rgb(107 114 128)" }}
+                                  >
+                                    {d.date}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
                       )}
-                    </h2>
+                    </div>
                   </div>
-                  <div className="flex rounded-lg overflow-hidden border-2 ml-2" style={{ borderColor: PRIMARY }}>
+                  <div
+                    className="flex rounded-lg overflow-hidden border-2 ml-2"
+                    style={{ borderColor: PRIMARY }}
+                  >
                     <button
                       className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all"
-                      style={{ backgroundColor: viewMode === 'po-kupcu' ? PRIMARY : 'transparent', color: viewMode === 'po-kupcu' ? 'white' : PRIMARY }}
-                      onClick={() => setViewMode('po-kupcu')}
+                      style={{
+                        backgroundColor:
+                          viewMode === "po-kupcu" ? PRIMARY : "transparent",
+                        color: viewMode === "po-kupcu" ? "white" : PRIMARY,
+                      }}
+                      onClick={() => setViewMode("po-kupcu")}
                     >
                       Po kupcu
                     </button>
                     <button
                       className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all border-l-2"
-                      style={{ backgroundColor: viewMode === 'po-proizvodu' ? PRIMARY : 'transparent', color: viewMode === 'po-proizvodu' ? 'white' : PRIMARY, borderColor: PRIMARY }}
-                      onClick={() => setViewMode('po-proizvodu')}
+                      style={{
+                        backgroundColor:
+                          viewMode === "po-proizvodu" ? PRIMARY : "transparent",
+                        color: viewMode === "po-proizvodu" ? "white" : PRIMARY,
+                        borderColor: PRIMARY,
+                      }}
+                      onClick={() => setViewMode("po-proizvodu")}
                     >
                       Po proizvodu
                     </button>
@@ -452,10 +667,14 @@ export function AktivneNarudzbe({ onBack }: Props) {
                     <div
                       className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm"
                       style={{
-                        background: spremljenoCount === totalProizvoda
-                          ? `${SECONDARY}22`
-                          : `${PRIMARY}10`,
-                        color: spremljenoCount === totalProizvoda ? SECONDARY : PRIMARY,
+                        background:
+                          spremljenoCount === totalProizvoda
+                            ? `${SECONDARY}22`
+                            : `${PRIMARY}10`,
+                        color:
+                          spremljenoCount === totalProizvoda
+                            ? SECONDARY
+                            : PRIMARY,
                         border: `2px solid ${spremljenoCount === totalProizvoda ? SECONDARY : `${PRIMARY}30`}`,
                       }}
                     >
@@ -469,7 +688,6 @@ export function AktivneNarudzbe({ onBack }: Props) {
 
           {/* ─── MAIN FLEX ──────────────────────────────────────────────────── */}
           <div className="flex-1 overflow-hidden">
-
             {/* ═══════════════════════════════════════════════════════════════
                 LIJEVI PANEL — sačuvan za kasnije korištenje
                 Uključuje: dugmad za dane, info panel (kupci/stavki)
@@ -524,42 +742,58 @@ export function AktivneNarudzbe({ onBack }: Props) {
             </div>
             ════════════════════════════════════════════════════════════════ */}
 
-              {/* ─── NARUDŽBE PO KUPCU — full width ────────────────────────── */}
-              <div className="flex flex-col overflow-hidden h-full">
-                <div className="flex-1 overflow-y-auto">
-                  <div className="p-6">
-
-                    {/* Loading narudžbi */}
-                    {loadingNarudzbe ? (
-                      <div className="flex items-center justify-center py-12">
-                        <Loader className="w-8 h-8 animate-spin" style={{ color: PRIMARY }} />
-                        <span className="ml-3 text-gray-600">Učitavanje narudžbi...</span>
-                      </div>
-
-                    ) : narudzbePoKupcu.length === 0 ? (
-                      <div className="text-center py-12">
-                        <p className="text-gray-500 text-lg">
-                          Nema aktivnih narudžbi za odabrani dan
-                        </p>
-                        <p className="text-gray-400 text-sm mt-2">
-                          Odaberite dan da vidite narudžbe
-                        </p>
-                      </div>
-
-                    ) : viewMode === 'po-kupcu' ? (
-                      <div className="space-y-6">
-                        {narudzbePoKupcu.map((kupac) => {
-                          const allFilled = kupac.proizvodi.length > 0 && kupac.proizvodi.every((p, idx) => {
-                            const k = rowKey(getKupacGroupingKey(kupac.sifra_kupca, kupac.referentni_broj), p.sif, idx);
-                            return saveStatus[k] === 'ok';
+            {/* ─── NARUDŽBE PO KUPCU — full width ────────────────────────── */}
+            <div className="flex flex-col overflow-hidden h-full">
+              <div className="flex-1 overflow-y-auto">
+                <div className="p-6">
+                  {/* Loading narudžbi */}
+                  {loadingNarudzbe ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader
+                        className="w-8 h-8 animate-spin"
+                        style={{ color: PRIMARY }}
+                      />
+                      <span className="ml-3 text-gray-600">
+                        Učitavanje narudžbi...
+                      </span>
+                    </div>
+                  ) : narudzbePoKupcu.length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500 text-lg">
+                        Nema aktivnih narudžbi za odabrani dan
+                      </p>
+                      <p className="text-gray-400 text-sm mt-2">
+                        Odaberite dan da vidite narudžbe
+                      </p>
+                    </div>
+                  ) : viewMode === "po-kupcu" ? (
+                    <div className="space-y-6">
+                      {sortedNarudzbePoKupcu.map((kupac) => {
+                        const allFilled =
+                          kupac.proizvodi.length > 0 &&
+                          kupac.proizvodi.every((p, idx) => {
+                            const k = rowKey(
+                              getKupacGroupingKey(
+                                kupac.sifra_kupca,
+                                kupac.referentni_broj,
+                              ),
+                              p.sif,
+                              idx,
+                            );
+                            return saveStatus[k] === "ok";
                           });
-                          return (
+                        return (
                           <div
-                            key={getKupacGroupingKey(kupac.sifra_kupca, kupac.referentni_broj)}
+                            key={getKupacGroupingKey(
+                              kupac.sifra_kupca,
+                              kupac.referentni_broj,
+                            )}
                             className="bg-white rounded-xl shadow-lg overflow-hidden transition-all"
                             style={{
                               border: "2px solid rgb(229 231 235)",
-                              boxShadow: allFilled ? `0 0 0 3px ${SECONDARY}` : undefined,
+                              boxShadow: allFilled
+                                ? `0 0 0 3px ${SECONDARY}`
+                                : undefined,
                             }}
                           >
                             {/* ─── Zaglavlje kupca (identično KOMERCIJALA, drugačije boje) ─── */}
@@ -571,7 +805,10 @@ export function AktivneNarudzbe({ onBack }: Props) {
                             >
                               <div className="flex items-center">
                                 <div className="flex items-baseline gap-3 flex-wrap">
-                                  <h3 className="text-xl font-bold" style={{ color: PRIMARY }}>
+                                  <h3
+                                    className="text-xl font-bold"
+                                    style={{ color: PRIMARY }}
+                                  >
                                     {kupac.naziv_kupca}
                                   </h3>
                                   {kupac.naziv_grada && (
@@ -581,7 +818,9 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                   )}
                                 </div>
                                 <div className="ml-auto bg-white px-4 py-2 rounded-lg shadow">
-                                  <span className="text-sm text-gray-600">Ukupno stavki:</span>
+                                  <span className="text-sm text-gray-600">
+                                    Ukupno stavki:
+                                  </span>
                                   <span
                                     className="ml-2 text-lg font-bold"
                                     style={{ color: SECONDARY }}
@@ -595,18 +834,55 @@ export function AktivneNarudzbe({ onBack }: Props) {
                             {/* ─── Tabela sa proizvodima ─── */}
                             <div className="overflow-x-auto">
                               <table className="w-full table-fixed divide-y divide-gray-200">
-                                <thead style={{ backgroundColor: allFilled ? `${SECONDARY}22` : undefined }}>
+                                <thead
+                                  style={{
+                                    backgroundColor: allFilled
+                                      ? `${SECONDARY}22`
+                                      : undefined,
+                                  }}
+                                >
                                   <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: allFilled ? SECONDARY : "rgb(107 114 128)" }}>
+                                    <th
+                                      className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                                      style={{
+                                        color: allFilled
+                                          ? SECONDARY
+                                          : "rgb(107 114 128)",
+                                      }}
+                                    >
                                       NAZIV PROIZVODA
                                     </th>
-                                    <th className="px-2 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: allFilled ? SECONDARY : "rgb(107 114 128)", width: 52 }}>
+                                    <th
+                                      className="px-2 py-3 text-right text-xs font-medium uppercase tracking-wider"
+                                      style={{
+                                        color: allFilled
+                                          ? SECONDARY
+                                          : "rgb(107 114 128)",
+                                        width: 52,
+                                      }}
+                                    >
                                       JM
                                     </th>
-                                    <th className="px-2 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: allFilled ? SECONDARY : "rgb(107 114 128)", width: 96 }}>
+                                    <th
+                                      className="px-2 py-3 text-right text-xs font-medium uppercase tracking-wider"
+                                      style={{
+                                        color: allFilled
+                                          ? SECONDARY
+                                          : "rgb(107 114 128)",
+                                        width: 96,
+                                      }}
+                                    >
                                       KOLIČINA
                                     </th>
-                                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: allFilled ? SECONDARY : "rgb(107 114 128)", width: 220 }}>
+                                    <th
+                                      className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider"
+                                      style={{
+                                        color: allFilled
+                                          ? SECONDARY
+                                          : "rgb(107 114 128)",
+                                        width: 220,
+                                      }}
+                                    >
                                       SPREMLJENO
                                     </th>
                                   </tr>
@@ -614,100 +890,209 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                 <tbody className="bg-white divide-y divide-gray-200">
                                   {kupac.proizvodi.length === 0 ? (
                                     <tr>
-                                      <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                                      <td
+                                        colSpan={4}
+                                        className="px-6 py-8 text-center text-gray-500"
+                                      >
                                         Nema proizvoda
                                       </td>
                                     </tr>
                                   ) : (
                                     kupac.proizvodi.map((proizvod, index) => {
-                                      const key = rowKey(getKupacGroupingKey(kupac.sifra_kupca, kupac.referentni_broj), proizvod.sif, index);
+                                      const key = rowKey(
+                                        getKupacGroupingKey(
+                                          kupac.sifra_kupca,
+                                          kupac.referentni_broj,
+                                        ),
+                                        proizvod.sif,
+                                        index,
+                                      );
                                       const isListening = voiceKey === key;
                                       return (
                                         <tr
                                           key={key}
                                           className="transition-colors cursor-pointer"
                                           style={
-                                            saveStatus[key] === 'error'
-                                              ? { backgroundColor: "rgb(254 242 242)" }
-                                              : saveStatus[key] === 'ok'
-                                                ? { backgroundColor: `${SECONDARY}22` }
+                                            saveStatus[key] === "error"
+                                              ? {
+                                                  backgroundColor:
+                                                    "rgb(254 242 242)",
+                                                }
+                                              : saveStatus[key] === "ok"
+                                                ? {
+                                                    backgroundColor: `${SECONDARY}22`,
+                                                  }
                                                 : undefined
                                           }
                                           onClick={() => {
-                                            const hasVal = spremljeno[key] && spremljeno[key] !== "-1.000";
+                                            const hasVal =
+                                              spremljeno[key] &&
+                                              spremljeno[key] !== "-1.000";
                                             if (hasVal) setConfirmKey(key);
-                                            else inputRefs.current.get(key)?.focus();
+                                            else
+                                              inputRefs.current
+                                                .get(key)
+                                                ?.focus();
                                           }}
                                         >
                                           <td className="px-6 py-4 text-sm text-gray-900 align-top">
-                                            <div>{proizvod.naziv_proizvoda}</div>
-                                            {proizvod.napomena && proizvod.napomena.trim() && proizvod.napomena.trim() !== "-" && (
-                                              <div className="mt-1 text-xs italic" style={{ color: SECONDARY }}>
-                                                {proizvod.napomena.trim()}
-                                              </div>
-                                            )}
+                                            <div>
+                                              {proizvod.naziv_proizvoda}
+                                            </div>
+                                            {proizvod.napomena &&
+                                              proizvod.napomena.trim() &&
+                                              proizvod.napomena.trim() !==
+                                                "-" && (
+                                                <div
+                                                  className="mt-1 text-xs italic"
+                                                  style={{ color: SECONDARY }}
+                                                >
+                                                  {proizvod.napomena.trim()}
+                                                </div>
+                                              )}
                                           </td>
                                           <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-900 align-top text-right">
                                             {proizvod.jm}
                                           </td>
-                                          <td className="px-2 py-4 whitespace-nowrap text-sm font-semibold align-top text-right" style={{ color: SECONDARY }}>
+                                          <td
+                                            className="px-2 py-4 whitespace-nowrap text-sm font-semibold align-top text-right"
+                                            style={{ color: SECONDARY }}
+                                          >
                                             {proizvod.kolicina}
                                           </td>
-                                          <td className="px-4 py-3 align-top" onClick={(e) => e.stopPropagation()}>
+                                          <td
+                                            className="px-4 py-3 align-top"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
                                             <div className="flex flex-col items-end gap-1">
                                               <div className="flex items-center gap-1">
-                                              <input
-                                                ref={(el) => inputRefs.current.set(key, el)}
-                                                type="text"
-                                                inputMode="decimal"
-                                                value={spremljeno[key] ?? ""}
-                                                onChange={(e) => handleSpremljenoChange(key, e.target.value)}
-                                                placeholder="-1.000"
-                                                className="w-24 text-right text-sm font-bold border-2 rounded-lg px-2 py-2 focus:outline-none transition"
-                                                style={{
-                                                  borderColor: saveStatus[key] === 'error' ? "rgb(239 68 68)" : saveStatus[key] === 'ok' ? PRIMARY : "rgb(209 213 219)",
-                                                  color: spremljeno[key] === "-1.000" ? "rgb(156 163 175)" : PRIMARY,
-                                                  backgroundColor: saveStatus[key] === 'error' ? "rgb(254 242 242)" : saveStatus[key] === 'ok' ? `${PRIMARY}10` : "",
-                                                }}
-                                                onMouseDown={(e) => {
-                                                  if (spremljeno[key] && spremljeno[key] !== "-1.000") {
-                                                    e.preventDefault();
-                                                    setConfirmKey(key);
+                                                <input
+                                                  ref={(el) =>
+                                                    inputRefs.current.set(
+                                                      key,
+                                                      el,
+                                                    )
                                                   }
-                                                }}
-                                                onFocus={(e) => { e.target.style.backgroundColor = "white"; e.target.select(); }}
-                                                onBlur={(e) => {
-                                                  e.target.style.backgroundColor = "";
-                                                  handleSpremljenoBlur(key, proizvod.sifra_tabele, napomenaOp[key]);
-                                                }}
-                                              />
-                                              <button
-                                                type="button"
-                                                onClick={() => startVoice(key)}
-                                                className="p-2 rounded-lg transition-all"
-                                                style={{
-                                                  backgroundColor: isListening ? "#fee2e2" : `${PRIMARY}18`,
-                                                  color: isListening ? "#dc2626" : PRIMARY,
-                                                }}
-                                                title="Glasovni unos"
-                                              >
-                                                <Mic className={`w-4 h-4 ${isListening ? "animate-pulse" : ""}`} />
-                                              </button>
-                                              {saveStatus[key] === 'saving' && <Loader className="w-3 h-3 animate-spin text-gray-400" />}
-                                              {saveStatus[key] === 'ok'      && <CheckCircle2 className="w-3 h-3" style={{ color: SECONDARY }} />}
-                                              {saveStatus[key] === 'error'   && <XCircle className="w-3 h-3 text-red-500" />}
+                                                  type="text"
+                                                  inputMode="decimal"
+                                                  value={spremljeno[key] ?? ""}
+                                                  onChange={(e) =>
+                                                    handleSpremljenoChange(
+                                                      key,
+                                                      e.target.value,
+                                                    )
+                                                  }
+                                                  placeholder="-1.000"
+                                                  className="w-24 text-right text-sm font-bold border-2 rounded-lg px-2 py-2 focus:outline-none transition"
+                                                  style={{
+                                                    borderColor:
+                                                      saveStatus[key] ===
+                                                      "error"
+                                                        ? "rgb(239 68 68)"
+                                                        : saveStatus[key] ===
+                                                            "ok"
+                                                          ? PRIMARY
+                                                          : "rgb(209 213 219)",
+                                                    color:
+                                                      spremljeno[key] ===
+                                                      "-1.000"
+                                                        ? "rgb(156 163 175)"
+                                                        : PRIMARY,
+                                                    backgroundColor:
+                                                      saveStatus[key] ===
+                                                      "error"
+                                                        ? "rgb(254 242 242)"
+                                                        : saveStatus[key] ===
+                                                            "ok"
+                                                          ? `${PRIMARY}10`
+                                                          : "",
+                                                  }}
+                                                  onMouseDown={(e) => {
+                                                    if (
+                                                      spremljeno[key] &&
+                                                      spremljeno[key] !==
+                                                        "-1.000"
+                                                    ) {
+                                                      e.preventDefault();
+                                                      setConfirmKey(key);
+                                                    }
+                                                  }}
+                                                  onFocus={(e) => {
+                                                    e.target.style.backgroundColor =
+                                                      "white";
+                                                    e.target.select();
+                                                  }}
+                                                  onBlur={(e) => {
+                                                    e.target.style.backgroundColor =
+                                                      "";
+                                                    handleSpremljenoBlur(
+                                                      key,
+                                                      proizvod.sifra_tabele,
+                                                      napomenaOp[key],
+                                                    );
+                                                  }}
+                                                />
+                                                <button
+                                                  type="button"
+                                                  onClick={() =>
+                                                    startVoice(key)
+                                                  }
+                                                  className="p-2 rounded-lg transition-all"
+                                                  style={{
+                                                    backgroundColor: isListening
+                                                      ? "#fee2e2"
+                                                      : `${PRIMARY}18`,
+                                                    color: isListening
+                                                      ? "#dc2626"
+                                                      : PRIMARY,
+                                                  }}
+                                                  title="Glasovni unos"
+                                                >
+                                                  <Mic
+                                                    className={`w-4 h-4 ${isListening ? "animate-pulse" : ""}`}
+                                                  />
+                                                </button>
+                                                {saveStatus[key] ===
+                                                  "saving" && (
+                                                  <Loader className="w-3 h-3 animate-spin text-gray-400" />
+                                                )}
+                                                {saveStatus[key] === "ok" && (
+                                                  <CheckCircle2
+                                                    className="w-3 h-3"
+                                                    style={{ color: SECONDARY }}
+                                                  />
+                                                )}
+                                                {saveStatus[key] ===
+                                                  "error" && (
+                                                  <XCircle className="w-3 h-3 text-red-500" />
+                                                )}
                                               </div>
                                               <button
                                                 type="button"
-                                                onClick={() => setNoteModal({ key, sifra_tabele: proizvod.sifra_tabele, title: `${proizvod.sif}${proizvod.sifra_tabele ? ` (${proizvod.sifra_tabele})` : ""} — ${proizvod.naziv_proizvoda}` })}
+                                                onClick={() =>
+                                                  setNoteModal({
+                                                    key,
+                                                    sifra_tabele:
+                                                      proizvod.sifra_tabele,
+                                                    title: `${proizvod.sif}${proizvod.sifra_tabele ? ` (${proizvod.sifra_tabele})` : ""} — ${proizvod.naziv_proizvoda}`,
+                                                  })
+                                                }
                                                 className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all self-end"
                                                 style={{
-                                                  backgroundColor: napomenaOp[key] ? `${SECONDARY}22` : `${PRIMARY}10`,
-                                                  color: napomenaOp[key] ? SECONDARY : PRIMARY,
+                                                  backgroundColor: napomenaOp[
+                                                    key
+                                                  ]
+                                                    ? `${SECONDARY}22`
+                                                    : `${PRIMARY}10`,
+                                                  color: napomenaOp[key]
+                                                    ? SECONDARY
+                                                    : PRIMARY,
                                                 }}
                                               >
                                                 <MessageSquare className="w-3 h-3" />
-                                                {napomenaOp[key] ? "napomena ✓" : "napomena"}
+                                                {napomenaOp[key]
+                                                  ? "napomena ✓"
+                                                  : "napomena"}
                                               </button>
                                             </div>
                                           </td>
@@ -718,167 +1103,332 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                 </tbody>
                               </table>
                             </div>
-
                           </div>
                         );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="space-y-6">
-                        {proizvodiPoNazivu.map((proizvod) => {
-                          const allFilledP = proizvod.stavke.every(s => saveStatus[s.key] === 'ok');
-                          return (
+                      })}
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {proizvodiPoNazivu.map((proizvod) => {
+                        const allFilledP = proizvod.stavke.every(
+                          (s) => saveStatus[s.key] === "ok",
+                        );
+                        return (
+                          <div
+                            key={proizvod.sif}
+                            className="bg-white rounded-xl shadow-lg overflow-hidden transition-all"
+                            style={{
+                              border: "2px solid rgb(229 231 235)",
+                              boxShadow: allFilledP
+                                ? `0 0 0 3px ${SECONDARY}`
+                                : undefined,
+                            }}
+                          >
+                            {/* Zaglavlje proizvoda */}
                             <div
-                              key={proizvod.sif}
-                              className="bg-white rounded-xl shadow-lg overflow-hidden transition-all"
-                              style={{ border: "2px solid rgb(229 231 235)", boxShadow: allFilledP ? `0 0 0 3px ${SECONDARY}` : undefined }}
+                              className="px-6 py-4 border-b-2 border-gray-200"
+                              style={{
+                                background: `linear-gradient(to right, ${PRIMARY}18, ${SECONDARY}18)`,
+                              }}
                             >
-                              {/* Zaglavlje proizvoda */}
-                              <div
-                                className="px-6 py-4 border-b-2 border-gray-200"
-                                style={{ background: `linear-gradient(to right, ${PRIMARY}18, ${SECONDARY}18)` }}
-                              >
-                                <div className="flex items-center">
-                                  <div className="flex items-baseline gap-3 flex-wrap">
-                                    <h3 className="text-xl font-bold" style={{ color: PRIMARY }}>
-                                      {proizvod.naziv}
-                                    </h3>
-                                    <span className="text-xs text-gray-600">
-                                      Šifra: <span className="font-semibold">{proizvod.sif}</span>
-                                      {proizvod.sifra_tabele && <span className="text-gray-400 ml-1">({proizvod.sifra_tabele})</span>}
+                              <div className="flex items-center">
+                                <div className="flex items-baseline gap-3 flex-wrap">
+                                  <h3
+                                    className="text-xl font-bold"
+                                    style={{ color: PRIMARY }}
+                                  >
+                                    {proizvod.naziv}
+                                  </h3>
+                                  <span className="text-xs text-gray-600">
+                                    Šifra:{" "}
+                                    <span className="font-semibold">
+                                      {proizvod.sif}
                                     </span>
-                                    <span className="text-xs text-gray-500">
-                                      JM: <span className="font-semibold text-gray-700">{proizvod.jm}</span>
+                                    {proizvod.sifra_tabele && (
+                                      <span className="text-gray-400 ml-1">
+                                        ({proizvod.sifra_tabele})
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    JM:{" "}
+                                    <span className="font-semibold text-gray-700">
+                                      {proizvod.jm}
                                     </span>
-                                  </div>
-                                  <div className="ml-auto bg-white px-4 py-2 rounded-lg shadow">
-                                    <span className="text-sm text-gray-600">Kupaca:</span>
-                                    <span className="ml-2 text-lg font-bold" style={{ color: SECONDARY }}>
-                                      {proizvod.stavke.length}
-                                    </span>
-                                  </div>
+                                  </span>
+                                </div>
+                                <div className="ml-auto bg-white px-4 py-2 rounded-lg shadow">
+                                  <span className="text-sm text-gray-600">
+                                    Kupaca:
+                                  </span>
+                                  <span
+                                    className="ml-2 text-lg font-bold"
+                                    style={{ color: SECONDARY }}
+                                  >
+                                    {proizvod.stavke.length}
+                                  </span>
                                 </div>
                               </div>
+                            </div>
 
-                              {/* Tabela kupaca */}
-                              <div className="overflow-x-auto">
-                                <table className="w-full table-fixed divide-y divide-gray-200">
-                                  <thead style={{ backgroundColor: allFilledP ? `${SECONDARY}22` : undefined }}>
-                                    <tr>
-                                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: allFilledP ? SECONDARY : "rgb(107 114 128)" }}>KUPAC</th>
-                                      <th className="px-2 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: allFilledP ? SECONDARY : "rgb(107 114 128)", width: 96 }}>KOLIČINA</th>
-                                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: allFilledP ? SECONDARY : "rgb(107 114 128)", width: 220 }}>SPREMLJENO</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="bg-white divide-y divide-gray-200">
-                                    {proizvod.stavke.map((stavka) => {
-                                      const isListening = voiceKey === stavka.key;
-                                      return (
-                                        <tr
-                                          key={stavka.key}
-                                          className="transition-colors cursor-pointer"
-                                          style={
-                                            saveStatus[stavka.key] === 'error'
-                                              ? { backgroundColor: "rgb(254 242 242)" }
-                                              : saveStatus[stavka.key] === 'ok'
-                                                ? { backgroundColor: `${SECONDARY}22` }
-                                                : undefined
-                                          }
-                                          onClick={() => {
-                                            const hasVal = spremljeno[stavka.key] && spremljeno[stavka.key] !== "-1.000";
-                                            if (hasVal) setConfirmKey(stavka.key);
-                                            else inputRefs.current.get(stavka.key)?.focus();
-                                          }}
-                                        >
-                                          <td className="px-6 py-4 text-sm text-gray-900 align-top">
-                                            <div className="flex items-baseline gap-2 flex-wrap">
-                                              <span>{stavka.nazivKupca}</span>
-                                              {stavka.nazivGrada && (
-                                                <span className="text-xs text-gray-500 font-medium">{stavka.nazivGrada}</span>
-                                              )}
-                                            </div>
-                                            {stavka.napomena && stavka.napomena.trim() && stavka.napomena.trim() !== "-" && (
-                                              <div className="mt-1 text-xs italic" style={{ color: SECONDARY }}>{stavka.napomena.trim()}</div>
+                            {/* Tabela kupaca */}
+                            <div className="overflow-x-auto">
+                              <table className="w-full table-fixed divide-y divide-gray-200">
+                                <thead
+                                  style={{
+                                    backgroundColor: allFilledP
+                                      ? `${SECONDARY}22`
+                                      : undefined,
+                                  }}
+                                >
+                                  <tr>
+                                    <th
+                                      className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                                      style={{
+                                        color: allFilledP
+                                          ? SECONDARY
+                                          : "rgb(107 114 128)",
+                                      }}
+                                    >
+                                      KUPAC
+                                    </th>
+                                    <th
+                                      className="px-2 py-3 text-right text-xs font-medium uppercase tracking-wider"
+                                      style={{
+                                        color: allFilledP
+                                          ? SECONDARY
+                                          : "rgb(107 114 128)",
+                                        width: 96,
+                                      }}
+                                    >
+                                      KOLIČINA
+                                    </th>
+                                    <th
+                                      className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider"
+                                      style={{
+                                        color: allFilledP
+                                          ? SECONDARY
+                                          : "rgb(107 114 128)",
+                                        width: 220,
+                                      }}
+                                    >
+                                      SPREMLJENO
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                  {proizvod.stavke.map((stavka) => {
+                                    const isListening = voiceKey === stavka.key;
+                                    return (
+                                      <tr
+                                        key={stavka.key}
+                                        className="transition-colors cursor-pointer"
+                                        style={
+                                          saveStatus[stavka.key] === "error"
+                                            ? {
+                                                backgroundColor:
+                                                  "rgb(254 242 242)",
+                                              }
+                                            : saveStatus[stavka.key] === "ok"
+                                              ? {
+                                                  backgroundColor: `${SECONDARY}22`,
+                                                }
+                                              : undefined
+                                        }
+                                        onClick={() => {
+                                          const hasVal =
+                                            spremljeno[stavka.key] &&
+                                            spremljeno[stavka.key] !== "-1.000";
+                                          if (hasVal) setConfirmKey(stavka.key);
+                                          else
+                                            inputRefs.current
+                                              .get(stavka.key)
+                                              ?.focus();
+                                        }}
+                                      >
+                                        <td className="px-6 py-4 text-sm text-gray-900 align-top">
+                                          <div className="flex items-baseline gap-2 flex-wrap">
+                                            <span>{stavka.nazivKupca}</span>
+                                            {stavka.nazivGrada && (
+                                              <span className="text-xs text-gray-500 font-medium">
+                                                {stavka.nazivGrada}
+                                              </span>
                                             )}
-                                          </td>
-                                          <td className="px-2 py-4 whitespace-nowrap text-sm font-semibold align-top text-right" style={{ color: SECONDARY }}>
-                                            {stavka.kolicina}
-                                          </td>
-                                          <td className="px-4 py-3 align-top" onClick={(e) => e.stopPropagation()}>
-                                            <div className="flex flex-col items-end gap-1">
-                                              <div className="flex items-center gap-1">
+                                          </div>
+                                          {stavka.napomena &&
+                                            stavka.napomena.trim() &&
+                                            stavka.napomena.trim() !== "-" && (
+                                              <div
+                                                className="mt-1 text-xs italic"
+                                                style={{ color: SECONDARY }}
+                                              >
+                                                {stavka.napomena.trim()}
+                                              </div>
+                                            )}
+                                        </td>
+                                        <td
+                                          className="px-2 py-4 whitespace-nowrap text-sm font-semibold align-top text-right"
+                                          style={{ color: SECONDARY }}
+                                        >
+                                          {stavka.kolicina}
+                                        </td>
+                                        <td
+                                          className="px-4 py-3 align-top"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <div className="flex flex-col items-end gap-1">
+                                            <div className="flex items-center gap-1">
                                               <input
-                                                ref={(el) => inputRefs.current.set(stavka.key, el)}
+                                                ref={(el) =>
+                                                  inputRefs.current.set(
+                                                    stavka.key,
+                                                    el,
+                                                  )
+                                                }
                                                 type="text"
                                                 inputMode="decimal"
-                                                value={spremljeno[stavka.key] ?? "-1.000"}
-                                                onChange={(e) => handleSpremljenoChange(stavka.key, e.target.value)}
+                                                value={
+                                                  spremljeno[stavka.key] ??
+                                                  "-1.000"
+                                                }
+                                                onChange={(e) =>
+                                                  handleSpremljenoChange(
+                                                    stavka.key,
+                                                    e.target.value,
+                                                  )
+                                                }
                                                 placeholder="-1.000"
                                                 className="w-24 text-right text-sm font-bold border-2 rounded-lg px-2 py-2 focus:outline-none transition"
                                                 style={{
-                                                  borderColor: saveStatus[stavka.key] === 'error' ? "rgb(239 68 68)" : saveStatus[stavka.key] === 'ok' ? PRIMARY : "rgb(209 213 219)",
-                                                  color: spremljeno[stavka.key] === "-1.000" ? "rgb(156 163 175)" : PRIMARY,
-                                                  backgroundColor: saveStatus[stavka.key] === 'error' ? "rgb(254 242 242)" : saveStatus[stavka.key] === 'ok' ? `${PRIMARY}10` : "",
+                                                  borderColor:
+                                                    saveStatus[stavka.key] ===
+                                                    "error"
+                                                      ? "rgb(239 68 68)"
+                                                      : saveStatus[
+                                                            stavka.key
+                                                          ] === "ok"
+                                                        ? PRIMARY
+                                                        : "rgb(209 213 219)",
+                                                  color:
+                                                    spremljeno[stavka.key] ===
+                                                    "-1.000"
+                                                      ? "rgb(156 163 175)"
+                                                      : PRIMARY,
+                                                  backgroundColor:
+                                                    saveStatus[stavka.key] ===
+                                                    "error"
+                                                      ? "rgb(254 242 242)"
+                                                      : saveStatus[
+                                                            stavka.key
+                                                          ] === "ok"
+                                                        ? `${PRIMARY}10`
+                                                        : "",
                                                 }}
                                                 onMouseDown={(e) => {
-                                                  if (spremljeno[stavka.key] && spremljeno[stavka.key] !== "-1.000") {
+                                                  if (
+                                                    spremljeno[stavka.key] &&
+                                                    spremljeno[stavka.key] !==
+                                                      "-1.000"
+                                                  ) {
                                                     e.preventDefault();
                                                     setConfirmKey(stavka.key);
                                                   }
                                                 }}
-                                                onFocus={(e) => { e.target.style.backgroundColor = "white"; e.target.select(); }}
+                                                onFocus={(e) => {
+                                                  e.target.style.backgroundColor =
+                                                    "white";
+                                                  e.target.select();
+                                                }}
                                                 onBlur={(e) => {
-                                                  e.target.style.backgroundColor = "";
-                                                  handleSpremljenoBlur(stavka.key, stavka.sifra_tabele, napomenaOp[stavka.key]);
+                                                  e.target.style.backgroundColor =
+                                                    "";
+                                                  handleSpremljenoBlur(
+                                                    stavka.key,
+                                                    stavka.sifra_tabele,
+                                                    napomenaOp[stavka.key],
+                                                  );
                                                 }}
                                               />
                                               <button
                                                 type="button"
-                                                onClick={() => startVoice(stavka.key)}
+                                                onClick={() =>
+                                                  startVoice(stavka.key)
+                                                }
                                                 className="p-2 rounded-lg transition-all"
                                                 style={{
-                                                  backgroundColor: isListening ? "#fee2e2" : `${PRIMARY}18`,
-                                                  color: isListening ? "#dc2626" : PRIMARY,
+                                                  backgroundColor: isListening
+                                                    ? "#fee2e2"
+                                                    : `${PRIMARY}18`,
+                                                  color: isListening
+                                                    ? "#dc2626"
+                                                    : PRIMARY,
                                                 }}
                                                 title="Glasovni unos"
                                               >
-                                                <Mic className={`w-4 h-4 ${isListening ? "animate-pulse" : ""}`} />
+                                                <Mic
+                                                  className={`w-4 h-4 ${isListening ? "animate-pulse" : ""}`}
+                                                />
                                               </button>
-                                              {saveStatus[stavka.key] === 'saving' && <Loader className="w-3 h-3 animate-spin text-gray-400" />}
-                                              {saveStatus[stavka.key] === 'ok'      && <CheckCircle2 className="w-3 h-3" style={{ color: SECONDARY }} />}
-                                              {saveStatus[stavka.key] === 'error'   && <XCircle className="w-3 h-3 text-red-500" />}
-                                              </div>
-                                              <button
-                                                type="button"
-                                                onClick={() => setNoteModal({ key: stavka.key, sifra_tabele: stavka.sifra_tabele, title: `${proizvod.sif}${proizvod.sifra_tabele ? ` (${proizvod.sifra_tabele})` : ""} — ${proizvod.naziv}` })}
-                                                className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all self-end"
-                                                style={{
-                                                  backgroundColor: napomenaOp[stavka.key] ? `${SECONDARY}22` : `${PRIMARY}10`,
-                                                  color: napomenaOp[stavka.key] ? SECONDARY : PRIMARY,
-                                                }}
-                                              >
-                                                <MessageSquare className="w-3 h-3" />
-                                                {napomenaOp[stavka.key] ? "napomena ✓" : "napomena"}
-                                              </button>
+                                              {saveStatus[stavka.key] ===
+                                                "saving" && (
+                                                <Loader className="w-3 h-3 animate-spin text-gray-400" />
+                                              )}
+                                              {saveStatus[stavka.key] ===
+                                                "ok" && (
+                                                <CheckCircle2
+                                                  className="w-3 h-3"
+                                                  style={{ color: SECONDARY }}
+                                                />
+                                              )}
+                                              {saveStatus[stavka.key] ===
+                                                "error" && (
+                                                <XCircle className="w-3 h-3 text-red-500" />
+                                              )}
                                             </div>
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                setNoteModal({
+                                                  key: stavka.key,
+                                                  sifra_tabele:
+                                                    stavka.sifra_tabele,
+                                                  title: `${proizvod.sif}${proizvod.sifra_tabele ? ` (${proizvod.sifra_tabele})` : ""} — ${proizvod.naziv}`,
+                                                })
+                                              }
+                                              className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all self-end"
+                                              style={{
+                                                backgroundColor: napomenaOp[
+                                                  stavka.key
+                                                ]
+                                                  ? `${SECONDARY}22`
+                                                  : `${PRIMARY}10`,
+                                                color: napomenaOp[stavka.key]
+                                                  ? SECONDARY
+                                                  : PRIMARY,
+                                              }}
+                                            >
+                                              <MessageSquare className="w-3 h-3" />
+                                              {napomenaOp[stavka.key]
+                                                ? "napomena ✓"
+                                                : "napomena"}
+                                            </button>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
-
             </div>
-
+          </div>
         </div>
       </div>
 
@@ -889,8 +1439,12 @@ export function AktivneNarudzbe({ onBack }: Props) {
             {/* Header */}
             <div className="flex items-center justify-between px-5 pt-5">
               <div>
-                <p className="text-xs text-gray-400 uppercase tracking-wide">Napomena za</p>
-                <p className="text-sm font-bold" style={{ color: PRIMARY }}>{noteModal.title}</p>
+                <p className="text-xs text-gray-400 uppercase tracking-wide">
+                  Napomena za
+                </p>
+                <p className="text-sm font-bold" style={{ color: PRIMARY }}>
+                  {noteModal.title}
+                </p>
               </div>
               <button
                 onClick={() => setNoteModal(null)}
@@ -906,12 +1460,19 @@ export function AktivneNarudzbe({ onBack }: Props) {
                 rows={4}
                 autoFocus
                 value={napomenaOp[noteModal.key] ?? ""}
-                onChange={(e) => setNapomenaOp(p => ({ ...p, [noteModal.key]: e.target.value }))}
+                onChange={(e) =>
+                  setNapomenaOp((p) => ({
+                    ...p,
+                    [noteModal.key]: e.target.value,
+                  }))
+                }
                 placeholder="Unesite napomenu..."
                 className="w-full text-sm border-2 rounded-xl px-3 py-2 focus:outline-none resize-none transition"
                 style={{ borderColor: "rgb(209 213 219)" }}
                 onFocus={(e) => (e.target.style.borderColor = PRIMARY)}
-                onBlur={(e) => (e.target.style.borderColor = "rgb(209 213 219)")}
+                onBlur={(e) =>
+                  (e.target.style.borderColor = "rgb(209 213 219)")
+                }
               />
             </div>
             {/* Dugmad */}
@@ -921,11 +1482,14 @@ export function AktivneNarudzbe({ onBack }: Props) {
                 onClick={() => startVoiceNote(noteModal.key)}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all"
                 style={{
-                  backgroundColor: voiceNoteKey === noteModal.key ? "#fee2e2" : `${PRIMARY}18`,
+                  backgroundColor:
+                    voiceNoteKey === noteModal.key ? "#fee2e2" : `${PRIMARY}18`,
                   color: voiceNoteKey === noteModal.key ? "#dc2626" : PRIMARY,
                 }}
               >
-                <Mic className={`w-4 h-4 ${voiceNoteKey === noteModal.key ? "animate-pulse" : ""}`} />
+                <Mic
+                  className={`w-4 h-4 ${voiceNoteKey === noteModal.key ? "animate-pulse" : ""}`}
+                />
                 {voiceNoteKey === noteModal.key ? "Snima..." : "Glasovni unos"}
               </button>
               <button
@@ -935,7 +1499,11 @@ export function AktivneNarudzbe({ onBack }: Props) {
                   const k = noteModal.key;
                   const val = spremljeno[k];
                   if (val && val !== "-1.000") {
-                    handleSpremljenoBlur(k, noteModal.sifra_tabele, napomenaOp[k]);
+                    handleSpremljenoBlur(
+                      k,
+                      noteModal.sifra_tabele,
+                      napomenaOp[k],
+                    );
                   }
                   setNoteModal(null);
                 }}
@@ -951,7 +1519,10 @@ export function AktivneNarudzbe({ onBack }: Props) {
       {confirmKey !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-2xl px-8 py-6 flex flex-col items-center gap-5 w-72">
-            <p className="text-base font-bold text-center" style={{ color: PRIMARY }}>
+            <p
+              className="text-base font-bold text-center"
+              style={{ color: PRIMARY }}
+            >
               DA LI ŽELITE DA MIJENJATE?
             </p>
             <div className="flex gap-3 w-full">
@@ -977,7 +1548,6 @@ export function AktivneNarudzbe({ onBack }: Props) {
           </div>
         </div>
       )}
-
     </div>
   );
 }

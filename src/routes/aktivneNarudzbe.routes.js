@@ -9,6 +9,9 @@ router.post('/azuriraj', AktivneNarudzbeController.azurirajProizvod);
 // Dohvati sve terene po danima (frontend bira današnji)
 router.get('/tereni', AktivneNarudzbeController.getTerenPoDanima);
 
+// Redosljed gradova za sortiranje kupaca
+router.get('/redosljed-gradova', AktivneNarudzbeController.getRedosljedGradova);
+
 // Detaljan prikaz narudžbi za teren
 router.get('/:sifraTerena', AktivneNarudzbeController.getAktivneNarudzbe);
 

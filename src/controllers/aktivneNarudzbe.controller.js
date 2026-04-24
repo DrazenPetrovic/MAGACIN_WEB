@@ -22,6 +22,17 @@ export const azurirajProizvod = async (req, res) => {
   }
 };
 
+// GET /api/aktivne-narudzbe-teren/redosljed-gradova
+export const getRedosljedGradova = async (req, res) => {
+  try {
+    const data = await AktivneNarudzbeService.getRedosljedGradova();
+    return res.json({ success: true, data });
+  } catch (error) {
+    console.error('getRedosljedGradova error:', error);
+    return res.status(500).json({ success: false, message: 'Greška pri dohvatanju redosljeda gradova' });
+  }
+};
+
 // GET /api/aktivne-narudzbe-teren/tereni
 // Vraća sve aktivne terene po danima — frontend filtrira za današnji dan
 export const getTerenPoDanima = async (req, res) => {

@@ -10,6 +10,16 @@ export const getTerenPoDanima = async () => {
   });
 };
 
+export const getRedosljedGradova = async () => {
+  return withConnection(async (connection) => {
+    const [rows] = await connection.execute(
+      "CALL erp.sp_dostava_tereni_redosljed_gradova()",
+    );
+    // console.log('getRedosljedGradova rows:', rows);
+    return Array.isArray(rows) && rows.length > 0 ? rows[0] : [];
+  });
+};
+
 export const getAktivneNarudzbeGrupisano = async (sifraTerena) => {
   return withConnection(async (connection) => {
     const [rows] = await connection.execute(
@@ -21,7 +31,11 @@ export const getAktivneNarudzbeGrupisano = async (sifraTerena) => {
   });
 };
 
-export const azurirajProizvod = async (sifraPolja, kolicinaZaUnos, napomena) => {
+export const azurirajProizvod = async (
+  sifraPolja,
+  kolicinaZaUnos,
+  napomena,
+) => {
   return withConnection(async (connection) => {
     const [rows] = await connection.execute(
       "CALL erp.sp_dostava_tereni_proizvodi_azuriranje_magacin(?, ?, ?)",
