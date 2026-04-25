@@ -10,6 +10,16 @@ export const getTerenPoDanima = async () => {
   });
 };
 
+export const getTerenPoDanimaArhiva = async () => {
+  return withConnection(async (connection) => {
+    const [rows] = await connection.execute(
+      "CALL erp.sp_pregled_aktivnih_terena_po_danima_arhiva()",
+    );
+    // console.log('getTerenPoDanimaArhiva rows:', rows);
+    return Array.isArray(rows) && rows.length > 0 ? rows[0] : [];
+  });
+};
+
 export const getRedosljedGradova = async () => {
   return withConnection(async (connection) => {
     const [rows] = await connection.execute(
@@ -51,6 +61,26 @@ export const getAktivneNarudzbe = async (sifraTerena) => {
       "CALL erp.sp_dostava_tereni_proizvodi(?)",
       [sifraTerena],
     );
+    return Array.isArray(rows) && rows.length > 0 ? rows[0] : [];
+  });
+};
+
+export const getArhiviraneNarudzbe = async () => {
+  return withConnection(async (connection) => {
+    const [rows] = await connection.execute(
+      "CALL erp.sp_dostava_tereni_proizvodi_arhiva()",
+    );
+    // console.log('getArhiviraneNarudzbe rows:', rows);
+    return Array.isArray(rows) && rows.length > 0 ? rows[0] : [];
+  });
+};
+
+export const getArhiviraneNarudzbeGrupisano = async () => {
+  return withConnection(async (connection) => {
+    const [rows] = await connection.execute(
+      "CALL erp.sp_dostava_tereni_proizvodi_grupisano_arhiva()",
+    );
+    // console.log('getArhiviraneNarudzbeGrupisano rows:', rows);
     return Array.isArray(rows) && rows.length > 0 ? rows[0] : [];
   });
 };

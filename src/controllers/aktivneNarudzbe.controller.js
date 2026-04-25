@@ -22,6 +22,39 @@ export const azurirajProizvod = async (req, res) => {
   }
 };
 
+// GET /api/aktivne-narudzbe-teren/tereni-arhiva
+export const getTerenPoDanimaArhiva = async (req, res) => {
+  try {
+    const data = await AktivneNarudzbeService.getTerenPoDanimaArhiva();
+    return res.json({ success: true, data });
+  } catch (error) {
+    console.error('getTerenPoDanimaArhiva error:', error);
+    return res.status(500).json({ success: false, message: 'Greška pri dohvatanju arhivskih terena' });
+  }
+};
+
+// GET /api/aktivne-narudzbe-teren/arhiva
+export const getArhiviraneNarudzbe = async (req, res) => {
+  try {
+    const data = await AktivneNarudzbeService.getArhiviraneNarudzbe();
+    return res.json({ success: true, data });
+  } catch (error) {
+    console.error('getArhiviraneNarudzbe error:', error);
+    return res.status(500).json({ success: false, message: 'Greška pri dohvatanju arhiviranih narudžbi' });
+  }
+};
+
+// GET /api/aktivne-narudzbe-teren/arhiva-grupisano
+export const getArhiviraneNarudzbeGrupisano = async (req, res) => {
+  try {
+    const data = await AktivneNarudzbeService.getArhiviraneNarudzbeGrupisano();
+    return res.json({ success: true, data });
+  } catch (error) {
+    console.error('getArhiviraneNarudzbeGrupisano error:', error);
+    return res.status(500).json({ success: false, message: 'Greška pri dohvatanju grupiranih arhiviranih narudžbi' });
+  }
+};
+
 // GET /api/aktivne-narudzbe-teren/redosljed-gradova
 export const getRedosljedGradova = async (req, res) => {
   try {

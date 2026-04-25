@@ -3,7 +3,6 @@ import {
   ArrowLeft,
   Loader,
   ChevronDown,
-  ChevronUp,
   Mic,
   MessageSquare,
   X,
@@ -86,6 +85,26 @@ const getKupacGroupingKey = (
   return norm ? `${sifraKupca}::${norm}` : String(sifraKupca);
 };
 
+// ===== SPEECH RECOGNITION =====
+
+interface ISpeechRec {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start(): void;
+  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+}
+
+const getSpeechRecognition = (): (new () => ISpeechRec) | undefined => {
+  const w = window as Window & {
+    SpeechRecognition?: new () => ISpeechRec;
+    webkitSpeechRecognition?: new () => ISpeechRec;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition;
+};
+
 // ===== PROPS =====
 
 interface Props {
@@ -106,7 +125,6 @@ export function AktivneNarudzbe({ onBack }: Props) {
   const [redosljedGradova, setRedosljedGradova] = useState<RedosljedGrada[]>(
     [],
   );
-  const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [viewMode, setViewMode] = useState<"po-kupcu" | "po-proizvodu">(
     "po-kupcu",
   );
@@ -136,22 +154,15 @@ export function AktivneNarudzbe({ onBack }: Props) {
   };
 
   const startVoice = (key: string) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
-    if (!SR) {
-      alert("Preglednik ne podržava glasovni unos.");
-      return;
-    }
-    const rec = new SR();
+    const SRCtor = getSpeechRecognition();
+    if (!SRCtor) { alert("Preglednik ne podržava glasovni unos."); return; }
+    const rec = new SRCtor();
     rec.lang = "bs-BA";
     rec.continuous = false;
     rec.interimResults = false;
     setVoiceKey(key);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    rec.onresult = (e: any) => {
-      const text: string = e.results[0][0].transcript;
+    rec.onresult = (e) => {
+      const text = e.results[0][0].transcript;
       const num = text.replace(",", ".").replace(/[^0-9.]/g, "");
       if (num) setSpremljeno((p) => ({ ...p, [key]: num }));
       setVoiceKey(null);
@@ -163,22 +174,15 @@ export function AktivneNarudzbe({ onBack }: Props) {
   };
 
   const startVoiceNote = (key: string) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
-    if (!SR) {
-      alert("Preglednik ne podržava glasovni unos.");
-      return;
-    }
-    const rec = new SR();
+    const SRCtor = getSpeechRecognition();
+    if (!SRCtor) { alert("Preglednik ne podržava glasovni unos."); return; }
+    const rec = new SRCtor();
     rec.lang = "bs-BA";
     rec.continuous = false;
     rec.interimResults = false;
     setVoiceNoteKey(key);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    rec.onresult = (e: any) => {
-      const text: string = e.results[0][0].transcript;
+    rec.onresult = (e) => {
+      const text = e.results[0][0].transcript;
       if (text) setNapomenaOp((p) => ({ ...p, [key]: text }));
       setVoiceNoteKey(null);
     };
@@ -245,13 +249,16 @@ export function AktivneNarudzbe({ onBack }: Props) {
           const now = new Date();
           const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
+          const sortedData = [...result.data].sort((a: TerenoData, b: TerenoData) =>
+            new Date(a.datum_dostave).getTime() - new Date(b.datum_dostave).getTime()
+          );
           const todayRecord: TerenoData =
-            result.data.find((t: TerenoData) => {
+            sortedData.find((t: TerenoData) => {
               if (!t.datum_dostave) return false;
               const d = new Date(t.datum_dostave);
               const dLocal = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-              return dLocal === todayLocal;
-            }) ?? result.data[0];
+              return dLocal > todayLocal;
+            }) ?? sortedData[0];
 
           setSelectedDay(todayRecord.sifra_terena_dostava);
           setSelectedTerenaSifra(todayRecord.sifra_terena);
@@ -433,7 +440,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
         },
       ]),
     ).values(),
-  ).sort((a, b) => a.sifraTerenaDostava - b.sifraTerenaDostava);
+  ).sort((a, b) => new Date(a.rawDate).getTime() - new Date(b.rawDate).getTime());
 
   const trenutniTeren = tereniData.find(
     (t) => t.sifra_terena_dostava === selectedDay,
@@ -552,14 +559,9 @@ export function AktivneNarudzbe({ onBack }: Props) {
       <div className="flex-1 flex flex-col overflow-hidden m-0 md:m-3">
         <div className="bg-white rounded-none md:rounded-2xl shadow-xl overflow-hidden flex flex-col h-full">
           {/* ─── HEADER — KOLAPSIBILAN (identično KOMERCIJALA) ──────────────── */}
-          <div
-            className={`border-b-2 border-gray-200 bg-white transition-all duration-300 relative flex-none ${
-              headerCollapsed ? "max-h-8" : "max-h-24"
-            }`}
-          >
+          <div className="border-b-2 border-gray-200 bg-white flex-none">
             <div className="flex items-center justify-between gap-3 px-6 md:px-8 py-2 md:py-4">
-              {!headerCollapsed && (
-                <>
+              <>
                   <div className="flex items-center gap-3 pl-6">
                     <button
                       onClick={onBack}
@@ -600,7 +602,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                           <div className="absolute left-0 top-full mt-1 z-30 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden min-w-52">
                             {uniqueDays.filter((d) => {
                               const dStr = d.rawDate ? toLocalDateStr(d.rawDate) : '';
-                              return dStr >= todayStr;
+                              return dStr > todayStr;
                             }).map((d) => {
                               const dStr = d.rawDate ? toLocalDateStr(d.rawDate) : '';
                               const isAfterToday = dStr > todayStr;
@@ -681,8 +683,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                       Spremljeno: {spremljenoCount}/{totalProizvoda}
                     </div>
                   )}
-                </>
-              )}
+              </>
             </div>
           </div>
 
@@ -975,6 +976,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                   }
                                                   type="text"
                                                   inputMode="decimal"
+                                                  pattern="[0-9.]*"
                                                   value={spremljeno[key] ?? ""}
                                                   onChange={(e) =>
                                                     handleSpremljenoChange(
@@ -1018,9 +1020,12 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                     }
                                                   }}
                                                   onFocus={(e) => {
-                                                    e.target.style.backgroundColor =
-                                                      "white";
-                                                    e.target.select();
+                                                    e.target.style.backgroundColor = "white";
+                                                    if (spremljeno[key] === "-1.000") {
+                                                      setSpremljeno((p) => ({ ...p, [key]: "" }));
+                                                    } else {
+                                                      e.target.select();
+                                                    }
                                                   }}
                                                   onBlur={(e) => {
                                                     e.target.style.backgroundColor =
@@ -1287,6 +1292,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                 }
                                                 type="text"
                                                 inputMode="decimal"
+                                                pattern="[0-9.]*"
                                                 value={
                                                   spremljeno[stavka.key] ??
                                                   "-1.000"
@@ -1335,9 +1341,12 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                   }
                                                 }}
                                                 onFocus={(e) => {
-                                                  e.target.style.backgroundColor =
-                                                    "white";
-                                                  e.target.select();
+                                                  e.target.style.backgroundColor = "white";
+                                                  if (spremljeno[stavka.key] === "-1.000") {
+                                                    setSpremljeno((p) => ({ ...p, [stavka.key]: "" }));
+                                                  } else {
+                                                    e.target.select();
+                                                  }
                                                 }}
                                                 onBlur={(e) => {
                                                   e.target.style.backgroundColor =

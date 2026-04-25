@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { LoginPanel } from './components/LoginPanel';
 import { Dashboard } from './components/Dashboard';
 import { AktivneNarudzbe } from './components/AktivneNarudzbe';
+import { ZavrseneNarudzbe } from './components/ZavrseneNarudzbe';
 import { verifyAuth, getCurrentUser, signOut } from './utils/auth';
 
-type Screen = 'dashboard' | 'aktivne-narudzbe';
+type Screen = 'dashboard' | 'aktivne-narudzbe' | 'zavrsene-narudzbe';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -57,6 +58,10 @@ function App() {
 
   if (screen === 'aktivne-narudzbe') {
     return <AktivneNarudzbe onBack={() => setScreen('dashboard')} />;
+  }
+
+  if (screen === 'zavrsene-narudzbe') {
+    return <ZavrseneNarudzbe onBack={() => setScreen('dashboard')} />;
   }
 
   return (

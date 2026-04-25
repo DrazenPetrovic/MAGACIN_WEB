@@ -12,6 +12,11 @@ router.get('/tereni', AktivneNarudzbeController.getTerenPoDanima);
 // Redosljed gradova za sortiranje kupaca
 router.get('/redosljed-gradova', AktivneNarudzbeController.getRedosljedGradova);
 
+// Arhiva terena i narudžbi
+router.get('/tereni-arhiva', AktivneNarudzbeController.getTerenPoDanimaArhiva);
+router.get('/arhiva', AktivneNarudzbeController.getArhiviraneNarudzbe);
+router.get('/arhiva-grupisano', AktivneNarudzbeController.getArhiviraneNarudzbeGrupisano);
+
 // Detaljan prikaz narudžbi za teren
 router.get('/:sifraTerena', AktivneNarudzbeController.getAktivneNarudzbe);
 

@@ -1,7 +1,7 @@
 import { LogOut, Package, MapPin, ClipboardList, CheckCircle2, LayoutList } from "lucide-react";
 import { theme } from "../theme";
 
-type Screen = 'dashboard' | 'aktivne-narudzbe';
+type Screen = 'dashboard' | 'aktivne-narudzbe' | 'zavrsene-narudzbe';
 
 interface DashboardProps {
   username: string;
@@ -35,6 +35,7 @@ const menuItems: { label: string; icon: typeof MapPin; bg: string; bgHover: stri
     bg: "#1A7F4B",
     bgHover: "#166840",
     bgPress: "#0F4F30",
+    screen: "zavrsene-narudzbe",
   },
   {
     label: "POPIS",
