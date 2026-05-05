@@ -1,25 +1,45 @@
-import { LogOut, Package, MapPin, ClipboardList, CheckCircle2, LayoutList } from "lucide-react";
+import {
+  LogOut,
+  Package,
+  MapPin,
+  ClipboardList,
+  CheckCircle2,
+  LayoutList,
+} from "lucide-react";
 import { theme } from "../theme";
 
-type Screen = 'dashboard' | 'aktivne-narudzbe' | 'zavrsene-narudzbe';
+type Screen =
+  | "dashboard"
+  | "aktivne-narudzbe"
+  | "zavrsene-narudzbe"
+  | "narudzbe-banja-luka";
 
 interface DashboardProps {
   username: string;
   vrstaRadnika: number;
   onLogout: () => void;
   onNavigate: (screen: Screen) => void;
+  localOrdersBadgeCount?: number;
 }
 
-const PRIMARY   = theme.primary;
+const PRIMARY = theme.primary;
 const SECONDARY = theme.secondary;
 
-const menuItems: { label: string; icon: typeof MapPin; bg: string; bgHover: string; bgPress: string; screen?: Screen }[] = [
+const menuItems: {
+  label: string;
+  icon: typeof MapPin;
+  bg: string;
+  bgHover: string;
+  bgPress: string;
+  screen?: Screen;
+}[] = [
   {
     label: "NARUDŽBE\nBANJA LUKA",
     icon: MapPin,
     bg: PRIMARY,
     bgHover: "#684f8a",
     bgPress: "#574176",
+    screen: "narudzbe-banja-luka",
   },
   {
     label: "AKTIVNE\nNARUDŽBE",
@@ -46,10 +66,17 @@ const menuItems: { label: string; icon: typeof MapPin; bg: string; bgHover: stri
   },
 ];
 
-export function Dashboard({ username, onLogout, onNavigate }: DashboardProps) {
+export function Dashboard({
+  username,
+  onLogout,
+  onNavigate,
+  localOrdersBadgeCount = 0,
+}: DashboardProps) {
   return (
-    <div className="flex flex-col" style={{ height: "100dvh", background: "#f1f5f9" }}>
-
+    <div
+      className="flex flex-col"
+      style={{ height: "100dvh", background: "#f1f5f9" }}
+    >
       {/* Header */}
       <header
         className="flex-none text-white shadow-md"
@@ -68,8 +95,14 @@ export function Dashboard({ username, onLogout, onNavigate }: DashboardProps) {
             <button
               onClick={onLogout}
               className="flex items-center gap-1.5 text-sm bg-white/20 px-3 py-2 rounded-lg active:bg-white/40 transition"
-              onTouchStart={(e) => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.35)")}
-              onTouchEnd={(e) => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.2)")}
+              onTouchStart={(e) =>
+                (e.currentTarget.style.backgroundColor =
+                  "rgba(255,255,255,0.35)")
+              }
+              onTouchEnd={(e) =>
+                (e.currentTarget.style.backgroundColor =
+                  "rgba(255,255,255,0.2)")
+              }
             >
               <LogOut className="w-4 h-4" />
               Odjava
@@ -80,27 +113,52 @@ export function Dashboard({ username, onLogout, onNavigate }: DashboardProps) {
 
       {/* 2×2 grid dugmadi */}
       <main className="flex-1 p-4 grid grid-cols-2 grid-rows-2 gap-4">
-        {menuItems.map(({ label, icon: Icon, bg, bgHover, bgPress, screen }) => (
-          <button
-            key={label}
-            onClick={() => screen && onNavigate(screen)}
-            className="flex flex-col items-center justify-center rounded-2xl shadow-lg text-white font-bold text-xl leading-snug tracking-wide active:scale-95 transition-transform select-none"
-            style={{ backgroundColor: bg }}
-            onTouchStart={(e) => (e.currentTarget.style.backgroundColor = bgPress)}
-            onTouchEnd={(e) => (e.currentTarget.style.backgroundColor = bg)}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = bgHover)}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = bg)}
-            onMouseDown={(e) => (e.currentTarget.style.backgroundColor = bgPress)}
-            onMouseUp={(e) => (e.currentTarget.style.backgroundColor = bgHover)}
-          >
-            <Icon className="mb-4" style={{ width: "3rem", height: "3rem" }} strokeWidth={1.5} />
-            {label.split("\n").map((line, i) => (
-              <span key={i} className="block text-center">{line}</span>
-            ))}
-          </button>
-        ))}
+        {menuItems.map(
+          ({ label, icon: Icon, bg, bgHover, bgPress, screen }) => (
+            <button
+              key={label}
+              onClick={() => screen && onNavigate(screen)}
+              className="relative flex flex-col items-center justify-center rounded-2xl shadow-lg text-white font-bold text-xl leading-snug tracking-wide active:scale-95 transition-transform select-none"
+              style={{ backgroundColor: bg }}
+              onTouchStart={(e) =>
+                (e.currentTarget.style.backgroundColor = bgPress)
+              }
+              onTouchEnd={(e) => (e.currentTarget.style.backgroundColor = bg)}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = bgHover)
+              }
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = bg)}
+              onMouseDown={(e) =>
+                (e.currentTarget.style.backgroundColor = bgPress)
+              }
+              onMouseUp={(e) =>
+                (e.currentTarget.style.backgroundColor = bgHover)
+              }
+            >
+              {screen === "narudzbe-banja-luka" &&
+                localOrdersBadgeCount > 0 && (
+                  <span
+                    className="absolute right-3 top-3 min-w-7 rounded-full px-2 py-1 text-xs font-extrabold text-white animate-pulse"
+                    style={{ backgroundColor: "#dc2626" }}
+                    aria-label={`Nove narudžbe: ${localOrdersBadgeCount}`}
+                  >
+                    {localOrdersBadgeCount > 99 ? "99+" : localOrdersBadgeCount}
+                  </span>
+                )}
+              <Icon
+                className="mb-4"
+                style={{ width: "3rem", height: "3rem" }}
+                strokeWidth={1.5}
+              />
+              {label.split("\n").map((line, i) => (
+                <span key={i} className="block text-center">
+                  {line}
+                </span>
+              ))}
+            </button>
+          ),
+        )}
       </main>
-
     </div>
   );
 }

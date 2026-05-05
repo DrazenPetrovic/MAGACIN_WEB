@@ -7,7 +7,8 @@
       "Bash(npx tsc *)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://185.99.2.164:3005/api/health)",
       "Bash(npm run *)",
-      "Bash(npx cap *)"
+      "Bash(npx cap *)",
+      "Bash(Move-Item \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\\\\src\\\\components\\\\NarudzbeBanjaLuka.tsx\" \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\\\\src\\\\components\\\\NarudzbeLokalno.tsx\")"
     ]
   }
 }
