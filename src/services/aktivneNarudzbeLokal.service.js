@@ -29,11 +29,11 @@ export const getPreparationByOrderId = async (orderId) => {
   });
 };
 
-export const addPreparedQuantity = async (preparationId, quantityToAdd, preparedBy, notes) => {
+export const addPreparedQuantity = async (preparationId, preparedQuantity, preparedBy, notes) => {
   return withConnection(async (conn) => {
     await conn.query(
       "CALL erp.sp_prepare_order(?, ?, ?, ?, @p_result, @p_message)",
-      [Number(preparationId), Number(quantityToAdd), Number(preparedBy), notes ?? null],
+      [Number(preparationId), Number(preparedQuantity), Number(preparedBy), notes ?? null],
     );
     const [[out]] = await conn.query(
       "SELECT @p_result AS result, @p_message AS message",

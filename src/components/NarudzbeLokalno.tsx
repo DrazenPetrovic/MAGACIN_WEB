@@ -13,7 +13,7 @@ import {
   Play,
 } from "lucide-react";
 import { theme } from "../theme";
-import { getCurrentUser } from "../utils/auth";
+
 import {
   LOCAL_ORDER_NEW_EVENT,
   playLocalOrderTone,
@@ -54,6 +54,8 @@ interface LokalnaNarudzba {
   notes: string | null;
   priority: number;
   status_id: number;
+  partner_order_number: string | null;
+  partner_order_date: string | null;
   items: LokalniProizvod[];
 }
 
@@ -75,6 +77,8 @@ interface RawOrder {
   status_id: number;
   priority: number;
   notes: string | null;
+  partner_order_number: string | null;
+  partner_order_date: string | null;
   created_at: string;
   updated_at: string;
   items?: RawItem[];
@@ -131,6 +135,8 @@ const mapOrder = (
   notes: raw.notes ?? null,
   priority: raw.priority ?? 1,
   status_id: raw.status_id ?? 1,
+  partner_order_number: raw.partner_order_number ?? null,
+  partner_order_date: raw.partner_order_date ?? null,
   items: raw.items ?? [],
 });
 
@@ -222,45 +228,37 @@ export function NarudzbeLokalno({ onBack }: Props) {
   >({});
 
   const handleZakljuciPripremu = async (nar: LokalnaNarudzba) => {
-    const user = getCurrentUser();
-    if (!user) return;
     setZakljuciStatus((p) => ({ ...p, [nar.order_id]: "saving" }));
 
     for (const item of nar.items) {
       if (!item.preparation_id) continue;
-      // Preskači stavke koje su već završene
-      if (item.order_status === "ready" || item.order_status === "unavailable")
-        continue;
+      // Preskači samo "ready" — "unavailable" se može ponovo ažurirati ako korisnik unese novu vrijednost
+      if (item.order_status === "ready") continue;
 
       const key = rowKey(item.item_id);
       const val = spremljeno[key];
 
-      // Ako je korisnik unio vrijednost (ali nije triggerovao blur/save) — spremi tu vrijednost
-      // Ako je polje prazno i status je pending — šalji 0 (nedostupno)
-      // Ako je status partial ali nema nove vrijednosti — preskoči (djelimično, ostavljamo)
-      let quantityToSend: number;
-      if (val && val !== "-1.000") {
-        const parsed = parseFloat(val.replace(",", "."));
-        quantityToSend = !isNaN(parsed) && parsed > 0 ? parsed : 0;
-      } else if (item.order_status === "pending") {
-        quantityToSend = 0;
-      } else {
-        continue;
-      }
+      // Preskači stavke bez unesene vrijednosti — procedura ne prihvata 0 ni prazno
+      if (!val || val === "-1.000") continue;
+      const parsed = parseFloat(val.replace(",", "."));
+      if (isNaN(parsed) || parsed <= 0) continue;
+      const quantityToSend = parsed;
 
-      await fetch(`${API_URL}/api/narudzbe-lokalno/azuriraj`, {
+      const res = await fetch(`${API_URL}/api/narudzbe-lokalno/azuriraj`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           preparation_id: item.preparation_id,
-          quantity_to_add: quantityToSend,
-          prepared_by: user.sifraRadnika,
+          prepared_quantity: quantityToSend,
           notes: napomenaOp[key] || null,
         }),
       }).catch(() => null);
 
-      setSpremljeno((p) => ({ ...p, [key]: "-1.000" }));
+      const resData = res ? await res.json().catch(() => null) : null;
+      if (resData?.success) {
+        setSpremljeno((p) => ({ ...p, [key]: "-1.000" }));
+      }
     }
 
     setZakljuciStatus((p) => ({ ...p, [nar.order_id]: "ok" }));
@@ -272,8 +270,6 @@ export function NarudzbeLokalno({ onBack }: Props) {
   };
 
   const handlePokreniPripremu = async (orderId: number) => {
-    const user = getCurrentUser();
-    if (!user) return;
     setPokrenuStatus((p) => ({ ...p, [orderId]: "saving" }));
     try {
       const res = await fetch(
@@ -282,10 +278,7 @@ export function NarudzbeLokalno({ onBack }: Props) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({
-            order_id: orderId,
-            prepared_by: user.sifraRadnika,
-          }),
+          body: JSON.stringify({ order_id: orderId }),
         },
       );
       const data = await res.json();
@@ -493,16 +486,13 @@ export function NarudzbeLokalno({ onBack }: Props) {
             });
             return updated;
           });
-          // Obriši polja za stavke koje su tek ažurirane
+          // Obriši polja samo za "ready" stavke — "unavailable" čuvamo jer korisnik može upisivati novu vrijednost
           setSpremljeno((prev) => {
             const updated = { ...prev };
             mapped.forEach((nar) => {
               nar.items.forEach((item) => {
                 const k = rowKey(item.item_id);
-                if (
-                  item.order_status === "ready" ||
-                  item.order_status === "unavailable"
-                ) {
+                if (item.order_status === "ready") {
                   updated[k] = "-1.000";
                 }
               });
@@ -588,6 +578,8 @@ export function NarudzbeLokalno({ onBack }: Props) {
           partner_name: string;
           branch_name: string | null;
           datum_dostave: string;
+          partner_order_number: string | null;
+          partner_order_date: string | null;
           item: LokalniProizvod;
           key: string;
         }[];
@@ -602,6 +594,8 @@ export function NarudzbeLokalno({ onBack }: Props) {
           partner_name: nar.partner_name,
           branch_name: nar.branch_name,
           datum_dostave: nar.requested_delivery_date,
+          partner_order_number: nar.partner_order_number,
+          partner_order_date: nar.partner_order_date,
           item,
           key: k,
         };
@@ -1110,6 +1104,23 @@ export function NarudzbeLokalno({ onBack }: Props) {
                                   </div>
                                 </div>
 
+                                {/* Broj narudžbe od partnera */}
+                                {nar.partner_order_number && (
+                                  <div className="mt-1.5 flex items-center gap-2 text-xs">
+                                    <span className="text-gray-400">Narudžba partnera:</span>
+                                    <span className="font-semibold text-gray-700">
+                                      {nar.partner_order_number}
+                                    </span>
+                                    {nar.partner_order_date && (
+                                      <>
+                                        <span className="text-gray-300">·</span>
+                                        <span className="text-gray-500">
+                                          {formatDate(nar.partner_order_date)}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
                                 {/* Napomena ispod */}
                                 {nar.notes && nar.notes.trim() && (
                                   <div className="mt-2 text-xs italic text-gray-500">
@@ -1449,6 +1460,19 @@ export function NarudzbeLokalno({ onBack }: Props) {
                                         {stavka.branch_name && (
                                           <div className="text-xs text-gray-500 mt-0.5">
                                             {stavka.branch_name}
+                                          </div>
+                                        )}
+                                        {stavka.partner_order_number && (
+                                          <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-400">
+                                            <span>Nar. par.:</span>
+                                            <span className="font-semibold text-gray-600">
+                                              {stavka.partner_order_number}
+                                            </span>
+                                            {stavka.partner_order_date && (
+                                              <span className="text-gray-400">
+                                                {formatDate(stavka.partner_order_date)}
+                                              </span>
+                                            )}
                                           </div>
                                         )}
                                       </td>

@@ -40,9 +40,10 @@ export const getNarudzbeLokalno = async (req, res) => {
 // Inicijalizuje pripremu narudžbe — poziva sp_prepare_order
 export const pokreniPripremu = async (req, res) => {
   try {
-    const { order_id, prepared_by } = req.body;
+    const { order_id } = req.body;
+    const prepared_by = req.user?.sifraRadnika;
     if (!order_id || !prepared_by) {
-      return res.status(400).json({ success: false, message: 'order_id i prepared_by su obavezni' });
+      return res.status(400).json({ success: false, message: 'order_id je obavezan, korisnik nije autentificiran' });
     }
     const out = await LokalService.prepareOrder(order_id, prepared_by);
     return res.json({ success: out.result === 1, message: out.message });
@@ -53,18 +54,19 @@ export const pokreniPripremu = async (req, res) => {
 };
 
 // POST /api/narudzbe-lokalno/azuriraj
-// Dodaje pripremljenu količinu na stavku — poziva sp_add_prepared_quantity
+// Dodaje pripremljenu količinu na stavku — poziva sp_prepare_order
 export const azurirajLokalno = async (req, res) => {
   try {
-    const { preparation_id, quantity_to_add, prepared_by, notes } = req.body;
-    console.log('[azuriraj] body:', { preparation_id, quantity_to_add, prepared_by });
-    if (!preparation_id || quantity_to_add === undefined || quantity_to_add === null || !prepared_by) {
+    const { preparation_id, prepared_quantity, notes } = req.body;
+    const prepared_by = req.user?.sifraRadnika;
+    console.log('[azuriraj] body:', { preparation_id, prepared_quantity, prepared_by });
+    if (!preparation_id || prepared_quantity === undefined || prepared_quantity === null || !prepared_by) {
       return res.status(400).json({
         success: false,
-        message: 'preparation_id, quantity_to_add i prepared_by su obavezni',
+        message: 'preparation_id i prepared_quantity su obavezni, korisnik nije autentificiran',
       });
     }
-    const out = await LokalService.addPreparedQuantity(preparation_id, quantity_to_add, prepared_by, notes ?? null);
+    const out = await LokalService.addPreparedQuantity(preparation_id, prepared_quantity, prepared_by, notes ?? null);
     console.log('[azuriraj] SP result:', out);
     return res.json({ success: out.result === 1, message: out.message });
   } catch (error) {

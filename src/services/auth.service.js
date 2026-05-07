@@ -11,11 +11,13 @@ export const login = async (username, password) => {
 
     const row = rows?.[0]?.[0] || null;
 
-    const sifraRadnika = row?.lozinka ?? null;
+    const sifraRadnika = row?.id_eksterni ?? null;
     const vrstaRadnika = row?.vrsta_radnika ?? null;
 
     if (sifraRadnika == null) return { success: false };
     if (sifraRadnika == 0) return { success: false };
+    console.log('[login] SP row raw:', row);
+    console.log('[login] sifraRadnika:', sifraRadnika, '| type:', typeof sifraRadnika);
 
     const token = jwt.sign(
       {

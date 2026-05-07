@@ -10,7 +10,7 @@ export interface LocalOrderNewEventDetail {
 export const playLocalOrderTone = (priority?: number) => {
   try {
     const file =
-      priority === 3 ? "/notifikacija_hitna.wav" : "/notifikacija_normalna.wav";
+      priority === 3 ? "/zvuk/notifikacija_hitna.wav" : "/zvuk/notifikacija_normalna.wav";
     const audio = new Audio(file);
     void audio.play();
   } catch {
