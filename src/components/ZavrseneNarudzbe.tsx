@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Loader, ChevronDown } from "lucide-react";
+import { ArrowLeft, Loader, ChevronDown, Search, X } from "lucide-react";
 import { theme } from "../theme";
 
 const PRIMARY   = theme.primary;
@@ -86,6 +86,7 @@ export function ZavrseneNarudzbe({ onBack }: Props) {
   const [selectedDay, setSelectedDay]             = useState<number | null>(null);
   const [viewMode, setViewMode]                   = useState<"po-kupcu" | "po-proizvodu">("po-kupcu");
   const [dayDropdownOpen, setDayDropdownOpen]     = useState(false);
+  const [searchTerm, setSearchTerm]               = useState("");
 
   useEffect(() => {
     const opts = { headers: { "Content-Type": "application/json" }, credentials: "include" as RequestCredentials };
@@ -181,6 +182,17 @@ export function ZavrseneNarudzbe({ onBack }: Props) {
 
   const trenutniTeren = tereniArhiva.find((t) => t.sifra_terena_dostava === selectedDay);
 
+  const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const activeSearch = searchTerm.length >= 4 ? norm(searchTerm) : "";
+
+  const vidljiviKupci = activeSearch
+    ? narudzbePoKupcu.filter((k) => norm(k.naziv_kupca).includes(activeSearch))
+    : narudzbePoKupcu;
+
+  const vidljiviProizvodi = activeSearch
+    ? proizvodiPoNazivu.filter((p) => norm(p.naziv).includes(activeSearch))
+    : proizvodiPoNazivu;
+
   const fmtSpremljeno = (sp?: number) => {
     const v = parseFloat(String(sp ?? -1));
     return isNaN(v) || v < 0 ? "—" : String(sp);
@@ -210,7 +222,7 @@ export function ZavrseneNarudzbe({ onBack }: Props) {
           <div className="border-b-2 border-gray-200 bg-white flex-none">
             <div className="flex items-center justify-between gap-3 px-6 md:px-8 py-2 md:py-4">
               <>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-none">
                   <button
                     onClick={onBack}
                     className="flex items-center justify-center w-8 h-8 rounded-lg border-2 transition-all active:scale-95"
@@ -269,7 +281,31 @@ export function ZavrseneNarudzbe({ onBack }: Props) {
                   </div>
                 </div>
 
-                <div className="flex rounded-lg overflow-hidden border-2" style={{ borderColor: PRIMARY }}>
+                {/* Pretraga */}
+                <div className="flex-1 flex justify-center px-2">
+                  <div className="relative w-full max-w-xs">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: PRIMARY }} />
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder={viewMode === "po-kupcu" ? "Pretraži po kupcu..." : "Pretraži po proizvodu..."}
+                      className="w-full pl-9 pr-8 py-1.5 text-sm border-2 rounded-lg focus:outline-none transition"
+                      style={{ borderColor: searchTerm.length >= 4 ? PRIMARY : "rgb(209 213 219)", color: "rgb(17 24 39)" }}
+                    />
+                    {searchTerm && (
+                      <button
+                        onClick={() => setSearchTerm("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded"
+                        style={{ color: "rgb(156 163 175)" }}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex rounded-lg overflow-hidden border-2 flex-none" style={{ borderColor: PRIMARY }}>
                   <button
                     className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all"
                     style={{ backgroundColor: viewMode === "po-kupcu" ? PRIMARY : "transparent", color: viewMode === "po-kupcu" ? "white" : PRIMARY }}
@@ -298,7 +334,10 @@ export function ZavrseneNarudzbe({ onBack }: Props) {
 
             ) : viewMode === "po-kupcu" ? (
               <div className="space-y-6">
-                {narudzbePoKupcu.map((kupac) => (
+                {vidljiviKupci.length === 0 && activeSearch ? (
+                  <div className="text-center py-12 text-gray-400 text-sm">Nema kupaca koji odgovaraju pretrazi</div>
+                ) : null}
+                {vidljiviKupci.map((kupac) => (
                   <div
                     key={kupacGroupKey(kupac.sifra_kupca, kupac.referentni_broj)}
                     className="bg-white rounded-xl shadow-lg overflow-hidden"
@@ -351,7 +390,10 @@ export function ZavrseneNarudzbe({ onBack }: Props) {
 
             ) : (
               <div className="space-y-6">
-                {proizvodiPoNazivu.map((proizvod) => (
+                {vidljiviProizvodi.length === 0 && activeSearch ? (
+                  <div className="text-center py-12 text-gray-400 text-sm">Nema proizvoda koji odgovaraju pretrazi</div>
+                ) : null}
+                {vidljiviProizvodi.map((proizvod) => (
                   <div
                     key={proizvod.sifra}
                     className="bg-white rounded-xl shadow-lg overflow-hidden"

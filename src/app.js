@@ -7,6 +7,7 @@ import healthRoutes from './routes/health.routes.js';
 import authRoutes from './routes/auth.routes.js';
 import aktivneNarudzbeRoutes from './routes/aktivneNarudzbe.routes.js';
 import narudzbeLokalnRoutes from './routes/narudzbeBanjaLuka.routes.js';
+import zavrseneLokalRoutes from './routes/zavrseneNarudzbeLokal.routes.js';
 
 export const createApp = () => {
   const app = express();
@@ -36,6 +37,7 @@ export const createApp = () => {
   app.use('/api/auth', authRoutes);
   app.use('/api/aktivne-narudzbe-teren', aktivneNarudzbeRoutes);
   app.use('/api/narudzbe-lokalno', narudzbeLokalnRoutes);
+  app.use('/api/zavrsene-narudzbe-lokal', zavrseneLokalRoutes);
 
   return app;
 };

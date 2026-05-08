@@ -3,6 +3,7 @@ import { LoginPanel } from "./components/LoginPanel";
 import { Dashboard } from "./components/Dashboard";
 import { AktivneNarudzbe } from "./components/AktivneNarudzbe";
 import { ZavrseneNarudzbe } from "./components/ZavrseneNarudzbe";
+import { ZavrseneNarudzbeLokal } from "./components/ZavrseneNarudzbeLokal";
 import { NarudzbeLokalno } from "./components/NarudzbeLokalno";
 import { verifyAuth, getCurrentUser, signOut } from "./utils/auth";
 import {
@@ -15,6 +16,7 @@ type Screen =
   | "dashboard"
   | "aktivne-narudzbe"
   | "zavrsene-narudzbe"
+  | "zavrsene-banja-luka"
   | "narudzbe-banja-luka";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3005";
 
@@ -183,6 +185,10 @@ function App() {
 
   if (screen === "zavrsene-narudzbe") {
     content = <ZavrseneNarudzbe onBack={() => setScreen("dashboard")} />;
+  }
+
+  if (screen === "zavrsene-banja-luka") {
+    content = <ZavrseneNarudzbeLokal onBack={() => setScreen("dashboard")} />;
   }
 
   if (screen === "narudzbe-banja-luka") {

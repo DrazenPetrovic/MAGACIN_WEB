@@ -10,7 +10,6 @@ export const verifyToken = (req, res, next) => {
 
     const verified = jwt.verify(token, env.JWT_SECRET);
     req.user = verified;
-    console.log('[verifyToken] req.user:', { sifraRadnika: verified.sifraRadnika, type: typeof verified.sifraRadnika, username: verified.username });
     next();
   } catch (error) {
     return res.status(401).json({ error: 'Nevažeći token' });

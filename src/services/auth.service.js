@@ -16,8 +16,6 @@ export const login = async (username, password) => {
 
     if (sifraRadnika == null) return { success: false };
     if (sifraRadnika == 0) return { success: false };
-    console.log('[login] SP row raw:', row);
-    console.log('[login] sifraRadnika:', sifraRadnika, '| type:', typeof sifraRadnika);
 
     const token = jwt.sign(
       {

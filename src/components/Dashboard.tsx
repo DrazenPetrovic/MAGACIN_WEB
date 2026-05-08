@@ -5,6 +5,7 @@ import {
   ClipboardList,
   CheckCircle2,
   LayoutList,
+  Archive,
 } from "lucide-react";
 import { theme } from "../theme";
 
@@ -12,6 +13,7 @@ type Screen =
   | "dashboard"
   | "aktivne-narudzbe"
   | "zavrsene-narudzbe"
+  | "zavrsene-banja-luka"
   | "narudzbe-banja-luka";
 
 interface DashboardProps {
@@ -32,6 +34,7 @@ const menuItems: {
   bgHover: string;
   bgPress: string;
   screen?: Screen;
+  fullWidth?: boolean;
 }[] = [
   {
     label: "NARUDŽBE\nBANJA LUKA",
@@ -50,6 +53,14 @@ const menuItems: {
     screen: "aktivne-narudzbe",
   },
   {
+    label: "ZAVRŠENE\nBANJA LUKA",
+    icon: Archive,
+    bg: "#1A5F7A",
+    bgHover: "#164f66",
+    bgPress: "#0F3A4D",
+    screen: "zavrsene-banja-luka",
+  },
+  {
     label: "ZAVRŠENE\nNARUDŽBE",
     icon: CheckCircle2,
     bg: "#1A7F4B",
@@ -63,6 +74,7 @@ const menuItems: {
     bg: "#2E4057",
     bgHover: "#243347",
     bgPress: "#1A2535",
+    fullWidth: true,
   },
 ];
 
@@ -111,15 +123,15 @@ export function Dashboard({
         </div>
       </header>
 
-      {/* 2×2 grid dugmadi */}
-      <main className="flex-1 p-4 grid grid-cols-2 grid-rows-2 gap-4">
+      {/* grid dugmadi */}
+      <main className="flex-1 p-4 grid grid-cols-2 gap-4" style={{ gridTemplateRows: "1fr 1fr auto" }}>
         {menuItems.map(
-          ({ label, icon: Icon, bg, bgHover, bgPress, screen }) => (
+          ({ label, icon: Icon, bg, bgHover, bgPress, screen, fullWidth }) => (
             <button
               key={label}
               onClick={() => screen && onNavigate(screen)}
               className="relative flex flex-col items-center justify-center rounded-2xl shadow-lg text-white font-bold text-xl leading-snug tracking-wide active:scale-95 transition-transform select-none"
-              style={{ backgroundColor: bg }}
+              style={{ backgroundColor: bg, gridColumn: fullWidth ? "1 / -1" : undefined, minHeight: fullWidth ? "5rem" : undefined }}
               onTouchStart={(e) =>
                 (e.currentTarget.style.backgroundColor = bgPress)
               }
