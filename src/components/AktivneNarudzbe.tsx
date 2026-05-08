@@ -10,6 +10,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { theme } from "../theme";
+import { apiFetch } from "../utils/apiFetch";
 
 const PRIMARY = theme.primary; // #785E9E
 const SECONDARY = theme.secondary; // #8FC74A
@@ -202,12 +203,10 @@ export function AktivneNarudzbe({ onBack }: Props) {
     if (isNaN(kolicina)) return;
     setSaveStatus((p) => ({ ...p, [key]: "saving" }));
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `${API_URL}/api/aktivne-narudzbe-teren/azuriraj`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
           body: JSON.stringify({
             sifraPolja: sifraTabele,
             kolicinaZaUnos: kolicina,
@@ -226,16 +225,9 @@ export function AktivneNarudzbe({ onBack }: Props) {
   const fetchTerenPoDanima = async () => {
     try {
       setLoading(true);
-      const fetchOpts = {
-        headers: { "Content-Type": "application/json" },
-        credentials: "include" as RequestCredentials,
-      };
       const [response, redosljedRes] = await Promise.all([
-        fetch(`${API_URL}/api/aktivne-narudzbe-teren/tereni`, fetchOpts),
-        fetch(
-          `${API_URL}/api/aktivne-narudzbe-teren/redosljed-gradova`,
-          fetchOpts,
-        ),
+        apiFetch(`${API_URL}/api/aktivne-narudzbe-teren/tereni`),
+        apiFetch(`${API_URL}/api/aktivne-narudzbe-teren/redosljed-gradova`),
       ]);
       if (!response.ok) throw new Error(`API error: ${response.status}`);
       const redosljedData = await redosljedRes.json();
@@ -280,17 +272,8 @@ export function AktivneNarudzbe({ onBack }: Props) {
       setNarudzbePoKupcu([]);
 
       const [grupisaneResponse, aktivneResponse] = await Promise.all([
-        fetch(
-          `${API_URL}/api/aktivne-narudzbe-teren/${sifraTerenaDostava}/grupisano`,
-          {
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-          },
-        ),
-        fetch(`${API_URL}/api/aktivne-narudzbe-teren/${sifraTerenaDostava}`, {
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-        }),
+        apiFetch(`${API_URL}/api/aktivne-narudzbe-teren/${sifraTerenaDostava}/grupisano`),
+        apiFetch(`${API_URL}/api/aktivne-narudzbe-teren/${sifraTerenaDostava}`),
       ]);
 
       if (!grupisaneResponse.ok || !aktivneResponse.ok) {

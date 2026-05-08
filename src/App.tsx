@@ -6,6 +6,7 @@ import { ZavrseneNarudzbe } from "./components/ZavrseneNarudzbe";
 import { ZavrseneNarudzbeLokal } from "./components/ZavrseneNarudzbeLokal";
 import { NarudzbeLokalno } from "./components/NarudzbeLokalno";
 import { verifyAuth, getCurrentUser, signOut } from "./utils/auth";
+import { apiFetch } from "./utils/apiFetch";
 import {
   LOCAL_ORDER_NEW_EVENT,
   playLocalOrderTone,
@@ -76,10 +77,7 @@ function App() {
 
     const monitor = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/narudzbe-lokalno`, {
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-        });
+        const res = await apiFetch(`${API_URL}/api/narudzbe-lokalno`);
         if (!res.ok) return;
 
         const result = await res.json();

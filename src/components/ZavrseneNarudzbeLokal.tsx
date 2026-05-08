@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Loader, Search, X, RefreshCw, Calendar } from "lucide-react";
+import { ArrowLeft, Loader, Search, X, RefreshCw } from "lucide-react";
 import { theme } from "../theme";
+import { apiFetch } from "../utils/apiFetch";
 
 const PRIMARY   = theme.primary;
 const SECONDARY = theme.secondary;
@@ -72,10 +73,7 @@ export function ZavrseneNarudzbeLokal({ onBack }: Props) {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/api/zavrsene-narudzbe-lokal`, {
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
+      const res = await apiFetch(`${API_URL}/api/zavrsene-narudzbe-lokal`);
       const result = await res.json();
       if (result.success) {
         const sorted = (result.data ?? []).sort((a: RawOrder, b: RawOrder) => {

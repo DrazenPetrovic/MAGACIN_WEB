@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, Loader, ChevronDown, Search, X } from "lucide-react";
 import { theme } from "../theme";
+import { apiFetch } from "../utils/apiFetch";
 
 const PRIMARY   = theme.primary;
 const SECONDARY = theme.secondary;
@@ -89,11 +90,10 @@ export function ZavrseneNarudzbe({ onBack }: Props) {
   const [searchTerm, setSearchTerm]               = useState("");
 
   useEffect(() => {
-    const opts = { headers: { "Content-Type": "application/json" }, credentials: "include" as RequestCredentials };
     Promise.all([
-      fetch(`${API_URL}/api/aktivne-narudzbe-teren/tereni-arhiva`, opts),
-      fetch(`${API_URL}/api/aktivne-narudzbe-teren/arhiva-grupisano`, opts),
-      fetch(`${API_URL}/api/aktivne-narudzbe-teren/arhiva`, opts),
+      apiFetch(`${API_URL}/api/aktivne-narudzbe-teren/tereni-arhiva`),
+      apiFetch(`${API_URL}/api/aktivne-narudzbe-teren/arhiva-grupisano`),
+      apiFetch(`${API_URL}/api/aktivne-narudzbe-teren/arhiva`),
     ])
       .then(async ([r1, r2, r3]) => {
         const [tereni, grupisano, narudzbe] = await Promise.all([r1.json(), r2.json(), r3.json()]);

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { theme } from "../theme";
 
+import { apiFetch } from "../utils/apiFetch";
 import {
   LOCAL_ORDER_NEW_EVENT,
   playLocalOrderTone,
@@ -244,10 +245,8 @@ export function NarudzbeLokalno({ onBack }: Props) {
       if (isNaN(parsed) || parsed <= 0) continue;
       const quantityToSend = parsed;
 
-      const res = await fetch(`${API_URL}/api/narudzbe-lokalno/azuriraj`, {
+      const res = await apiFetch(`${API_URL}/api/narudzbe-lokalno/azuriraj`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({
           preparation_id: item.preparation_id,
           prepared_quantity: quantityToSend,
@@ -393,10 +392,7 @@ export function NarudzbeLokalno({ onBack }: Props) {
   const fetchNarudzbe = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const res = await fetch(`${API_URL}/api/narudzbe-lokalno`, {
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
+      const res = await apiFetch(`${API_URL}/api/narudzbe-lokalno`);
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       const result = await res.json();
 

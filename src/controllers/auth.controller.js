@@ -36,6 +36,7 @@ export const login = async (req, res) => {
         success: true,
         message: 'Uspješno logovanje',
         user: result.user,
+        token: result.token,
       });
     }
 
@@ -86,6 +87,7 @@ export const loginByToken = async (req, res) => {
         success: true,
         message: 'Uspješno logovanje putem tokena',
         user: result.user,
+        token: result.token,
       });
     }
 
@@ -104,7 +106,12 @@ export const loginByToken = async (req, res) => {
 
 export const verify = (req, res) => {
   try {
-    const token = req.cookies.authToken;
+    let token = req.cookies.authToken;
+
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) token = authHeader.slice(7);
+    }
 
     if (!token) {
       return res.status(401).json({ authenticated: false, error: 'Not authenticated' });

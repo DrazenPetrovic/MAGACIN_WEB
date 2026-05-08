@@ -28,6 +28,7 @@ export const signIn = async (username: string, password: string) => {
 
     currentUser = data.user;
     localStorage.setItem("user", JSON.stringify(data.user));
+    if (data.token) localStorage.setItem("authToken", data.token);
     return { data: data.user, error: null };
   } catch {
     return {
@@ -57,6 +58,7 @@ export const signInByToken = async (rfidToken: string) => {
 
     currentUser = data.user;
     localStorage.setItem("user", JSON.stringify(data.user));
+    if (data.token) localStorage.setItem("authToken", data.token);
     return { data: data.user, error: null };
   } catch {
     return {
@@ -77,6 +79,7 @@ export const signOut = async () => {
   }
   currentUser = null;
   localStorage.removeItem("user");
+  localStorage.removeItem("authToken");
 };
 
 export const getCurrentUser = (): User | null => {
@@ -93,10 +96,15 @@ export const getCurrentUser = (): User | null => {
   return null;
 };
 
+export const getAuthToken = (): string | null =>
+  localStorage.getItem("authToken");
+
 export const verifyAuth = async (): Promise<User | null> => {
   try {
+    const token = getAuthToken();
     const response = await fetch(`${API_URL}/api/auth/verify`, {
       credentials: "include",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
 
     if (!response.ok) return null;

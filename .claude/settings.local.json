@@ -21,7 +21,8 @@
       "Bash(choco --version)",
       "Bash(find \"/c\" -maxdepth 6 -name \"javac.exe\")",
       "Bash(\"/c/Program Files/Android/Android Studio/jbr/bin/java\" -version)",
-      "PowerShell($env:JAVA_HOME = \"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\"; $env:PATH = \"$env:JAVA_HOME\\\\bin;$env:PATH\"; cd \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\\\\android\"; .\\\\gradlew.bat assembleDebug 2>&1)"
+      "PowerShell($env:JAVA_HOME = \"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\"; $env:PATH = \"$env:JAVA_HOME\\\\bin;$env:PATH\"; cd \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\\\\android\"; .\\\\gradlew.bat assembleDebug 2>&1)",
+      "PowerShell(cd \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\"; npx cap sync android 2>&1; $env:JAVA_HOME = \"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\"; $env:PATH = \"$env:JAVA_HOME\\\\bin;$env:PATH\"; cd android; .\\\\gradlew.bat assembleDebug 2>&1)"
     ]
   }
 }
