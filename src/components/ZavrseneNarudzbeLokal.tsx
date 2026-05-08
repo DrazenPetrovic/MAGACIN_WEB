@@ -280,19 +280,41 @@ export function ZavrseneNarudzbeLokal({ onBack }: Props) {
                             : `linear-gradient(to right, ${PRIMARY}18, ${SECONDARY}18)`,
                         }}
                       >
-                        <div className="grid grid-cols-3 items-center gap-4">
+                        <div className="flex flex-col gap-2">
 
-                          {/* Lijevo: partner + meta info */}
-                          <div className="min-w-0">
-                            <div className="flex items-baseline gap-2 flex-wrap">
-                              <h3 className="text-xl font-bold" style={{ color: isHitno ? "rgb(185 28 28)" : PRIMARY }}>
-                                {order.partner_name}
-                              </h3>
+                          {/* Red 1: naziv partnera — puna širina */}
+                          <div className="w-full">
+                            <h3 className="text-2xl font-bold truncate" style={{ color: PRIMARY }}>
+                              {order.partner_name}
                               {order.branch_name && (
-                                <span className="text-xs text-gray-500 font-medium">{order.branch_name}</span>
+                                <span className="text-sm font-medium text-gray-500 ml-2">{order.branch_name}</span>
                               )}
+                            </h3>
+                          </div>
+
+                          {/* Red 2: datum u centru, vrsta desno */}
+                          <div className="flex items-center">
+                            <div className="flex-1 flex flex-col items-center">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-0.5">
+                                Datum narudžbe
+                              </span>
+                              <span className="text-2xl font-extrabold" style={{ color: isHitno ? "rgb(185 28 28)" : PRIMARY }}>
+                                {order.order_date ? formatDate(order.order_date) : "—"}
+                              </span>
                             </div>
-                            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                            <div className="flex-none">
+                              <span
+                                className="text-sm font-bold px-4 py-2 rounded-lg border"
+                                style={{ background: prio.bg, color: prio.color, borderColor: prio.border }}
+                              >
+                                {prio.label}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Red 3: br. narudžbe + ref — puna širina, stavki desno */}
+                          <div className="flex items-center gap-4">
+                            <div className="flex-1 flex flex-wrap gap-x-5 gap-y-1 text-xs">
                               <span className="text-gray-400">
                                 Br. narudžbe: <span className="font-semibold text-gray-700">{order.order_number}</span>
                               </span>
@@ -305,38 +327,15 @@ export function ZavrseneNarudzbeLokal({ onBack }: Props) {
                                 <span className="text-gray-400">
                                   Nar. partnera: <span className="font-semibold text-gray-700">{order.partner_order_number}</span>
                                   {order.partner_order_date && (
-                                    <span className="text-gray-400 ml-1">· {formatDate(order.partner_order_date)}</span>
+                                    <span className="ml-1">· {formatDate(order.partner_order_date)}</span>
                                   )}
                                 </span>
                               )}
+                              {order.notes && order.notes.trim() && (
+                                <span className="italic text-gray-400">{order.notes.trim()}</span>
+                              )}
                             </div>
-                            {order.notes && order.notes.trim() && (
-                              <div className="mt-1 text-xs italic text-gray-500">{order.notes.trim()}</div>
-                            )}
-                          </div>
-
-                          {/* Centar: datum narudžbe */}
-                          <div className="flex flex-col items-center justify-center">
-                            <span className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1">
-                              Datum narudžbe
-                            </span>
-                            <span
-                              className="text-2xl font-extrabold"
-                              style={{ color: isHitno ? "rgb(185 28 28)" : PRIMARY }}
-                            >
-                              {order.order_date ? formatDate(order.order_date) : "—"}
-                            </span>
-                          </div>
-
-                          {/* Desno: priority + stavki */}
-                          <div className="flex flex-col items-end gap-2">
-                            <span
-                              className="text-xs font-bold px-3 py-1.5 rounded-lg border"
-                              style={{ background: prio.bg, color: prio.color, borderColor: prio.border }}
-                            >
-                              {prio.label}
-                            </span>
-                            <div className="bg-white px-4 py-2 rounded-lg shadow">
+                            <div className="flex-none bg-white px-4 py-2 rounded-lg shadow text-right">
                               <span className="text-sm text-gray-600">Stavki:</span>
                               <span className="ml-2 text-lg font-bold" style={{ color: SECONDARY }}>
                                 {order.items.length}
