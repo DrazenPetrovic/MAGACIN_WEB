@@ -6,3 +6,5 @@ Na tabletu (Android postavke):
 
 Display → Sleep → Never (ekran se ne gasi)
 Battery → App (Magacin Karpas) → Unrestricted (Android ne ubija app u pozadini)
+
+npm run tablet
