@@ -8,12 +8,12 @@ import {
   X,
   CheckCircle2,
   XCircle,
-  Calendar,
   RefreshCw,
   Play,
 } from "lucide-react";
 import { theme } from "../theme";
 
+import { Capacitor } from "@capacitor/core";
 import { apiFetch } from "../utils/apiFetch";
 import {
   LOCAL_ORDER_NEW_EVENT,
@@ -24,6 +24,7 @@ import {
 const PRIMARY = theme.primary;
 const SECONDARY = theme.secondary;
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3005";
+const isAndroid = Capacitor.getPlatform() === "android";
 
 // ===== INTERFEJSI =====
 
@@ -112,6 +113,9 @@ interface RawItem {
 }
 
 // ===== HELPERS =====
+
+const formatKolicina = (val: number): string =>
+  new Intl.NumberFormat("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(val);
 
 const formatDate = (dateString: string): string => {
   if (!dateString) return "";
@@ -268,15 +272,36 @@ export function NarudzbeLokalno({ onBack }: Props) {
     );
   };
 
+  const handleZakljuciStavku = async (item: LokalniProizvod) => {
+    if (!item.preparation_id || item.order_status === "ready") return;
+    const key = rowKey(item.item_id);
+    const val = spremljeno[key];
+    if (!val || val === "-1.000") return;
+    const parsed = parseFloat(val.replace(",", "."));
+    if (isNaN(parsed) || parsed <= 0) return;
+    setZakljuciStatus((p) => ({ ...p, [item.order_id]: "saving" }));
+    const res = await apiFetch(`${API_URL}/api/narudzbe-lokalno/azuriraj`, {
+      method: "POST",
+      body: JSON.stringify({
+        preparation_id: item.preparation_id,
+        prepared_quantity: parsed,
+        notes: napomenaOp[key] || null,
+      }),
+    }).catch(() => null);
+    const resData = res ? await res.json().catch(() => null) : null;
+    if (resData?.success) setSpremljeno((p) => ({ ...p, [key]: "-1.000" }));
+    setZakljuciStatus((p) => ({ ...p, [item.order_id]: "ok" }));
+    await fetchNarudzbe(true);
+    setTimeout(() => setZakljuciStatus((p) => ({ ...p, [item.order_id]: "idle" })), 2000);
+  };
+
   const handlePokreniPripremu = async (orderId: number) => {
     setPokrenuStatus((p) => ({ ...p, [orderId]: "saving" }));
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `${API_URL}/api/narudzbe-lokalno/pokreni-pripremu`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
           body: JSON.stringify({ order_id: orderId }),
         },
       );
@@ -576,6 +601,8 @@ export function NarudzbeLokalno({ onBack }: Props) {
           datum_dostave: string;
           partner_order_number: string | null;
           partner_order_date: string | null;
+          order_id: number;
+          order_status_id: number;
           item: LokalniProizvod;
           key: string;
         }[];
@@ -592,6 +619,8 @@ export function NarudzbeLokalno({ onBack }: Props) {
           datum_dostave: nar.requested_delivery_date,
           partner_order_number: nar.partner_order_number,
           partner_order_date: nar.partner_order_date,
+          order_id: nar.order_id,
+          order_status_id: nar.status_id,
           item,
           key: k,
         };
@@ -637,14 +666,14 @@ export function NarudzbeLokalno({ onBack }: Props) {
               className="font-semibold"
               style={{ color: isReady ? SECONDARY : "rgb(146 64 14)" }}
             >
-              {item.prepared_quantity}
+              {formatKolicina(item.prepared_quantity ?? 0)}
             </span>
             {!isReady && item.remaining_quantity !== undefined && (
               <>
                 <span className="text-gray-300">|</span>
                 <span className="text-gray-400">Ostalo:</span>
                 <span className="font-semibold text-amber-700">
-                  {item.remaining_quantity}
+                  {formatKolicina(item.remaining_quantity)}
                 </span>
               </>
             )}
@@ -892,6 +921,59 @@ export function NarudzbeLokalno({ onBack }: Props) {
                             priorityConfig[nar.priority] ?? priorityConfig[1];
                           const isHitno = nar.priority === 3;
                           const isUPripremi = nar.status_id === 2;
+                          const renderDugme = () => {
+                            const ps = pokrenuStatus[nar.order_id] ?? "idle";
+                            const msg = pokrenuMsg[nar.order_id];
+                            if (ps === "saving") return (
+                              <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white shadow text-sm text-gray-500 flex-none">
+                                <Loader className="w-4 h-4 animate-spin" />
+                                <span>Kreiranje...</span>
+                              </div>
+                            );
+                            if (ps === "ok") return (
+                              <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg shadow text-sm font-semibold flex-none" style={{ background: `${SECONDARY}22`, color: SECONDARY }}>
+                                <CheckCircle2 className="w-4 h-4" />
+                                <span>{msg || "Priprema kreirana"}</span>
+                              </div>
+                            );
+                            if (ps === "error") return (
+                              <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg shadow text-sm font-semibold text-red-600 bg-red-50 flex-none">
+                                <XCircle className="w-4 h-4" />
+                                <span>{msg || "Greška"}</span>
+                              </div>
+                            );
+                            if (isUPripremi) {
+                              const zs = zakljuciStatus[nar.order_id] ?? "idle";
+                              if (zs === "saving") return (
+                                <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white shadow text-sm text-amber-700 flex-none">
+                                  <Loader className="w-4 h-4 animate-spin" />
+                                  <span>Ažuriranje...</span>
+                                </div>
+                              );
+                              if (zs === "ok") return (
+                                <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg shadow text-sm font-semibold flex-none" style={{ background: `${SECONDARY}22`, color: SECONDARY }}>
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  <span>Ažurirano</span>
+                                </div>
+                              );
+                              return (
+                                <button type="button" onClick={(e) => { e.stopPropagation(); void handleZakljuciPripremu(nar); }}
+                                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg shadow text-sm font-bold transition-all active:scale-95 flex-none"
+                                  style={{ backgroundColor: "rgb(254 243 199)", color: "rgb(146 64 14)", border: "1px solid rgb(251 191 36)" }}>
+                                  <RefreshCw className="w-4 h-4" />
+                                  Ažuriraj
+                                </button>
+                              );
+                            }
+                            return (
+                              <button type="button" onClick={(e) => { e.stopPropagation(); void handlePokreniPripremu(nar.order_id); }}
+                                className="flex items-center gap-1.5 px-4 py-2 rounded-lg shadow text-sm font-bold text-white transition-all active:scale-95 flex-none"
+                                style={{ backgroundColor: PRIMARY }}>
+                                <Play className="w-4 h-4" />
+                                Pokreni
+                              </button>
+                            );
+                          };
                           return (
                             <div
                               key={nar.order_id}
@@ -939,114 +1021,78 @@ export function NarudzbeLokalno({ onBack }: Props) {
                                       : `linear-gradient(to right, ${PRIMARY}18, ${SECONDARY}18)`,
                                 }}
                               >
-                                <div className="flex flex-col gap-2">
-
-                                  {/* Red 1: naziv (lijevo) | dugme (desno) */}
-                                  <div className="flex items-center gap-3">
-                                    <h3 className="flex-1 text-2xl font-bold truncate" style={{ color: PRIMARY }}>
+                                {isAndroid ? (
+                                  <div className="flex flex-col gap-2">
+                                    <h3 className="text-2xl font-bold truncate" style={{ color: PRIMARY }}>
                                       {nar.partner_name}
                                       {nar.branch_name && (
                                         <span className="text-sm font-medium text-gray-500 ml-2">{nar.branch_name}</span>
                                       )}
                                     </h3>
-                                    {/* Pokreni / Ažuriraj dugme */}
-                                    {(() => {
-                                      const ps = pokrenuStatus[nar.order_id] ?? "idle";
-                                      const msg = pokrenuMsg[nar.order_id];
-                                      if (ps === "saving") return (
-                                        <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white shadow text-sm text-gray-500 flex-none">
-                                          <Loader className="w-4 h-4 animate-spin" />
-                                          <span>Kreiranje...</span>
-                                        </div>
-                                      );
-                                      if (ps === "ok") return (
-                                        <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg shadow text-sm font-semibold flex-none" style={{ background: `${SECONDARY}22`, color: SECONDARY }}>
-                                          <CheckCircle2 className="w-4 h-4" />
-                                          <span>{msg || "Priprema kreirana"}</span>
-                                        </div>
-                                      );
-                                      if (ps === "error") return (
-                                        <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg shadow text-sm font-semibold text-red-600 bg-red-50 flex-none">
-                                          <XCircle className="w-4 h-4" />
-                                          <span>{msg || "Greška"}</span>
-                                        </div>
-                                      );
-                                      if (isUPripremi) {
-                                        const zs = zakljuciStatus[nar.order_id] ?? "idle";
-                                        if (zs === "saving") return (
-                                          <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white shadow text-sm text-amber-700 flex-none">
-                                            <Loader className="w-4 h-4 animate-spin" />
-                                            <span>Ažuriranje...</span>
-                                          </div>
-                                        );
-                                        if (zs === "ok") return (
-                                          <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg shadow text-sm font-semibold flex-none" style={{ background: `${SECONDARY}22`, color: SECONDARY }}>
-                                            <CheckCircle2 className="w-4 h-4" />
-                                            <span>Ažurirano</span>
-                                          </div>
-                                        );
-                                        return (
-                                          <button type="button" onClick={(e) => { e.stopPropagation(); void handleZakljuciPripremu(nar); }}
-                                            className="flex items-center gap-1.5 px-4 py-2 rounded-lg shadow text-sm font-bold transition-all active:scale-95 flex-none"
-                                            style={{ backgroundColor: "rgb(254 243 199)", color: "rgb(146 64 14)", border: "1px solid rgb(251 191 36)" }}>
-                                            <RefreshCw className="w-4 h-4" />
-                                            Ažuriraj
-                                          </button>
-                                        );
-                                      }
-                                      return (
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); void handlePokreniPripremu(nar.order_id); }}
-                                          className="flex items-center gap-1.5 px-4 py-2 rounded-lg shadow text-sm font-bold text-white transition-all active:scale-95 flex-none"
-                                          style={{ backgroundColor: PRIMARY }}>
-                                          <Play className="w-4 h-4" />
-                                          Pokreni
-                                        </button>
-                                      );
-                                    })()}
-                                  </div>
-
-                                  {/* Red 2: datum u centru */}
-                                  {nar.requested_delivery_date && (
-                                    <div className="text-center">
-                                      <span className="text-lg font-bold" style={{ color: isHitno ? "rgb(185 28 28)" : PRIMARY }}>
-                                        {formatDate(nar.requested_delivery_date)}
+                                    {nar.notes && nar.notes.trim() && (
+                                      <p className="text-xs text-gray-600 italic">{nar.notes.trim()}</p>
+                                    )}
+                                    <div className="flex items-center gap-3">
+                                      <span className="flex-none text-xs font-bold px-3 py-1.5 rounded-lg border"
+                                        style={{ background: prio.bg, color: prio.color, borderColor: prio.border }}>
+                                        {prio.label}
                                       </span>
-                                    </div>
-                                  )}
-
-                                  {/* Red 3: meta podaci (lijevo) | vrsta (desno) */}
-                                  <div className="flex items-center gap-3">
-                                    <div className="flex-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                                      <span className="text-gray-400">
-                                        Br. narudžbe: <span className="font-semibold text-gray-700">{nar.order_number}</span>
-                                      </span>
-                                      {nar.partner_order_number && (
-                                        <span className="text-gray-400">
-                                          Nar. partnera: <span className="font-semibold text-gray-700">{nar.partner_order_number}</span>
-                                          {nar.partner_order_date && (
-                                            <span className="ml-1">· {formatDate(nar.partner_order_date)}</span>
-                                          )}
+                                      {nar.requested_delivery_date && (
+                                        <span className="flex-1 text-center text-lg font-bold" style={{ color: isHitno ? "rgb(185 28 28)" : PRIMARY }}>
+                                          {formatDate(nar.requested_delivery_date)}
                                         </span>
                                       )}
-                                    </div>
-                                    <span className="flex-none text-xs font-bold px-3 py-1.5 rounded-lg border"
-                                      style={{ background: prio.bg, color: prio.color, borderColor: prio.border }}>
-                                      {prio.label}
-                                    </span>
-                                  </div>
-
-                                  {/* Red 4: napomena (lijevo) | stavki (desno) */}
-                                  <div className="flex items-center gap-3">
-                                    <div className="flex-1 text-xs italic text-gray-400">
-                                      {nar.notes && nar.notes.trim() ? nar.notes.trim() : ""}
-                                    </div>
-                                    <div className="flex-none bg-white px-4 py-1.5 rounded-lg shadow">
-                                      <span className="text-sm text-gray-600">Stavki:</span>
-                                      <span className="ml-2 text-lg font-bold" style={{ color: SECONDARY }}>{nar.items.length}</span>
+                                      {renderDugme()}
                                     </div>
                                   </div>
-
-                                </div>
+                                ) : (
+                                  <div className="flex flex-col gap-2">
+                                    <div className="flex items-center gap-3">
+                                      <h3 className="flex-1 text-2xl font-bold truncate" style={{ color: PRIMARY }}>
+                                        {nar.partner_name}
+                                        {nar.branch_name && (
+                                          <span className="text-sm font-medium text-gray-500 ml-2">{nar.branch_name}</span>
+                                        )}
+                                      </h3>
+                                      {renderDugme()}
+                                    </div>
+                                    {nar.requested_delivery_date && (
+                                      <div className="text-center">
+                                        <span className="text-lg font-bold" style={{ color: isHitno ? "rgb(185 28 28)" : PRIMARY }}>
+                                          {formatDate(nar.requested_delivery_date)}
+                                        </span>
+                                      </div>
+                                    )}
+                                    <div className="flex items-center gap-3">
+                                      <div className="flex-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                                        <span className="text-gray-400">
+                                          Br. narudžbe: <span className="font-semibold text-gray-700">{nar.order_number}</span>
+                                        </span>
+                                        {nar.partner_order_number && (
+                                          <span className="text-gray-400">
+                                            Nar. partnera: <span className="font-semibold text-gray-700">{nar.partner_order_number}</span>
+                                            {nar.partner_order_date && (
+                                              <span className="ml-1">· {formatDate(nar.partner_order_date)}</span>
+                                            )}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="flex-none text-xs font-bold px-3 py-1.5 rounded-lg border"
+                                        style={{ background: prio.bg, color: prio.color, borderColor: prio.border }}>
+                                        {prio.label}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      <div className="flex-1 text-xs italic text-gray-400">
+                                        {nar.notes && nar.notes.trim() ? nar.notes.trim() : ""}
+                                      </div>
+                                      <div className="flex-none bg-white px-4 py-1.5 rounded-lg shadow">
+                                        <span className="text-sm text-gray-600">Stavki:</span>
+                                        <span className="ml-2 text-lg font-bold" style={{ color: SECONDARY }}>{nar.items.length}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
 
                               {/* Tabela sa proizvodima */}
@@ -1082,61 +1128,47 @@ export function NarudzbeLokalno({ onBack }: Props) {
                                           : undefined,
                                       }}
                                     >
-                                      <tr>
-                                        <th
-                                          className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
-                                          style={{
-                                            color: allFilled
-                                              ? SECONDARY
-                                              : "rgb(107 114 128)",
-                                          }}
-                                        >
-                                          NAZIV PROIZVODA
-                                        </th>
-                                        <th
-                                          className="px-2 py-3 text-right text-xs font-medium uppercase tracking-wider"
-                                          style={{
-                                            color: allFilled
-                                              ? SECONDARY
-                                              : "rgb(107 114 128)",
-                                            width: 52,
-                                          }}
-                                        >
-                                          JM
-                                        </th>
-                                        <th
-                                          className="px-2 py-3 text-right text-xs font-medium uppercase tracking-wider"
-                                          style={{
-                                            color: isUPripremi
-                                              ? "rgb(146 64 14)"
-                                              : allFilled
-                                                ? SECONDARY
-                                                : "rgb(107 114 128)",
-                                            width: 96,
-                                          }}
-                                        >
-                                          {isUPripremi
-                                            ? "PREOSTALO"
-                                            : "KOLIČINA"}
-                                        </th>
-                                        <th
-                                          className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider"
-                                          style={{
-                                            color: allFilled
-                                              ? SECONDARY
-                                              : "rgb(107 114 128)",
-                                            width: 220,
-                                          }}
-                                        >
-                                          SPREMLJENO
-                                        </th>
-                                      </tr>
+                                      {isAndroid ? (
+                                        <tr>
+                                          <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                                            style={{ color: allFilled ? SECONDARY : "rgb(107 114 128)" }}>
+                                            NAZIV PROIZVODA
+                                          </th>
+                                          <th className="px-2 py-3 text-right text-xs font-medium uppercase tracking-wider"
+                                            style={{ color: isUPripremi ? "rgb(146 64 14)" : allFilled ? SECONDARY : "rgb(107 114 128)", width: 90 }}>
+                                            {isUPripremi ? "PREOS." : "KOL."}
+                                          </th>
+                                          <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider"
+                                            style={{ color: allFilled ? SECONDARY : "rgb(107 114 128)", width: 200 }}>
+                                            SPREMLJENO
+                                          </th>
+                                        </tr>
+                                      ) : (
+                                        <tr>
+                                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                                            style={{ color: allFilled ? SECONDARY : "rgb(107 114 128)" }}>
+                                            NAZIV PROIZVODA
+                                          </th>
+                                          <th className="px-2 py-3 text-right text-xs font-medium uppercase tracking-wider"
+                                            style={{ color: allFilled ? SECONDARY : "rgb(107 114 128)", width: 52 }}>
+                                            JM
+                                          </th>
+                                          <th className="px-2 py-3 text-right text-xs font-medium uppercase tracking-wider"
+                                            style={{ color: isUPripremi ? "rgb(146 64 14)" : allFilled ? SECONDARY : "rgb(107 114 128)", width: 96 }}>
+                                            {isUPripremi ? "PREOSTALO" : "KOLIČINA"}
+                                          </th>
+                                          <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider"
+                                            style={{ color: allFilled ? SECONDARY : "rgb(107 114 128)", width: 220 }}>
+                                            SPREMLJENO
+                                          </th>
+                                        </tr>
+                                      )}
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
                                       {nar.items.length === 0 ? (
                                         <tr>
                                           <td
-                                            colSpan={4}
+                                            colSpan={isAndroid ? 3 : 4}
                                             className="px-6 py-8 text-center text-gray-500"
                                           >
                                             Nema stavki
@@ -1172,46 +1204,45 @@ export function NarudzbeLokalno({ onBack }: Props) {
                                                     ?.focus();
                                               }}
                                             >
-                                              <td className="px-6 py-4 text-sm text-gray-900 align-top">
+                                              <td className="px-4 py-3 text-sm text-gray-900 align-top">
                                                 {item.product_name}
                                               </td>
-                                              <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-900 align-top text-right">
-                                                {item.product_uom}
-                                              </td>
-                                              <td className="px-2 py-4 whitespace-nowrap text-sm font-semibold align-top text-right">
-                                                {item.remaining_quantity !==
-                                                undefined ? (
-                                                  <div className="flex flex-col items-end gap-0.5">
-                                                    <span
-                                                      style={{
-                                                        color: "rgb(146 64 14)",
-                                                      }}
-                                                    >
-                                                      {item.remaining_quantity}
-                                                    </span>
-                                                    <span className="text-xs text-gray-400 font-normal">
-                                                      /{item.quantity}
-                                                    </span>
-                                                  </div>
-                                                ) : (
-                                                  <span
-                                                    style={{ color: SECONDARY }}
-                                                  >
-                                                    {item.quantity}
-                                                  </span>
-                                                )}
-                                              </td>
+                                              {isAndroid ? (
+                                                <td className="pr-3 py-3 whitespace-nowrap text-sm font-semibold align-top text-right">
+                                                  {item.remaining_quantity !== undefined ? (
+                                                    <div className="flex flex-col items-end gap-0.5">
+                                                      <span style={{ color: "rgb(146 64 14)" }}>{formatKolicina(item.remaining_quantity)}</span>
+                                                      <span className="text-xs text-gray-400 font-normal">/{formatKolicina(item.quantity)} {item.product_uom}</span>
+                                                    </div>
+                                                  ) : (
+                                                    <div className="flex flex-col items-end gap-0.5">
+                                                      <span style={{ color: SECONDARY }}>{formatKolicina(item.quantity)}</span>
+                                                      <span className="text-xs text-gray-400 font-normal">{item.product_uom}</span>
+                                                    </div>
+                                                  )}
+                                                </td>
+                                              ) : (
+                                                <>
+                                                  <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-900 align-top text-right">
+                                                    {item.product_uom}
+                                                  </td>
+                                                  <td className="px-2 py-4 whitespace-nowrap text-sm font-semibold align-top text-right">
+                                                    {item.remaining_quantity !== undefined ? (
+                                                      <div className="flex flex-col items-end gap-0.5">
+                                                        <span style={{ color: "rgb(146 64 14)" }}>{formatKolicina(item.remaining_quantity)}</span>
+                                                        <span className="text-xs text-gray-400 font-normal">/{formatKolicina(item.quantity)}</span>
+                                                      </div>
+                                                    ) : (
+                                                      <span style={{ color: SECONDARY }}>{formatKolicina(item.quantity)}</span>
+                                                    )}
+                                                  </td>
+                                                </>
+                                              )}
                                               <td
                                                 className="px-4 py-3 align-top"
-                                                onClick={(e) =>
-                                                  e.stopPropagation()
-                                                }
+                                                onClick={(e) => e.stopPropagation()}
                                               >
-                                                {renderInput(
-                                                  key,
-                                                  item,
-                                                  item.product_name,
-                                                )}
+                                                {renderInput(key, item, item.product_name)}
                                               </td>
                                             </tr>
                                           );
@@ -1251,43 +1282,13 @@ export function NarudzbeLokalno({ onBack }: Props) {
                                 background: `linear-gradient(to right, ${PRIMARY}18, ${SECONDARY}18)`,
                               }}
                             >
-                              <div className="flex items-center">
-                                <div className="flex items-baseline gap-3 flex-wrap">
-                                  <h3
-                                    className="text-xl font-bold"
-                                    style={{ color: PRIMARY }}
-                                  >
-                                    {proizvod.product_name}
-                                  </h3>
-                                  <span className="text-xs text-gray-600">
-                                    ID:{" "}
-                                    <span className="font-semibold">
-                                      {proizvod.product_id}
-                                    </span>
-                                  </span>
-                                  <span className="text-xs text-gray-500">
-                                    JM:{" "}
-                                    <span className="font-semibold text-gray-700">
-                                      {proizvod.product_uom}
-                                    </span>
-                                  </span>
-                                  {proizvod.product_group && (
-                                    <span className="text-xs text-gray-400">
-                                      {proizvod.product_group}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="ml-auto bg-white px-4 py-2 rounded-lg shadow">
-                                  <span className="text-sm text-gray-600">
-                                    Partnera:
-                                  </span>
-                                  <span
-                                    className="ml-2 text-lg font-bold"
-                                    style={{ color: SECONDARY }}
-                                  >
-                                    {proizvod.stavke.length}
-                                  </span>
-                                </div>
+                              <div className="flex items-center gap-3">
+                                <h3 className="text-xl font-bold" style={{ color: PRIMARY }}>
+                                  {proizvod.product_name}
+                                </h3>
+                                <span className="text-xs text-gray-500">
+                                  JM: <span className="font-semibold text-gray-700">{proizvod.product_uom}</span>
+                                </span>
                               </div>
                             </div>
 
@@ -1302,147 +1303,93 @@ export function NarudzbeLokalno({ onBack }: Props) {
                                   }}
                                 >
                                   <tr>
-                                    <th
-                                      className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
-                                      style={{
-                                        color: allFilledP
-                                          ? SECONDARY
-                                          : "rgb(107 114 128)",
-                                      }}
-                                    >
+                                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                                      style={{ color: allFilledP ? SECONDARY : "rgb(107 114 128)" }}>
                                       PARTNER
                                     </th>
-                                    <th
-                                      className="px-2 py-3 text-left text-xs font-medium uppercase tracking-wider"
-                                      style={{
-                                        color: allFilledP
-                                          ? SECONDARY
-                                          : "rgb(107 114 128)",
-                                        width: 110,
-                                      }}
-                                    >
-                                      DOSTAVA
-                                    </th>
-                                    <th
-                                      className="px-2 py-3 text-right text-xs font-medium uppercase tracking-wider"
-                                      style={{
-                                        color: allFilledP
-                                          ? SECONDARY
-                                          : "rgb(107 114 128)",
-                                        width: 96,
-                                      }}
-                                    >
+                                    <th className="px-2 py-3 text-right text-xs font-medium uppercase tracking-wider"
+                                      style={{ color: allFilledP ? SECONDARY : "rgb(107 114 128)", width: 96 }}>
                                       KOLIČINA
                                     </th>
-                                    <th
-                                      className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider"
-                                      style={{
-                                        color: allFilledP
-                                          ? SECONDARY
-                                          : "rgb(107 114 128)",
-                                        width: 220,
-                                      }}
-                                    >
+                                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider"
+                                      style={{ color: allFilledP ? SECONDARY : "rgb(107 114 128)", width: 220 }}>
                                       SPREMLJENO
                                     </th>
                                   </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                  {proizvod.stavke.map((stavka) => (
+                                  {proizvod.stavke.map((stavka) => {
+                                    const isUPripremiS = stavka.order_status_id === 2;
+                                    const zsS = zakljuciStatus[stavka.order_id] ?? "idle";
+                                    return (
                                     <tr
                                       key={stavka.key}
                                       className="transition-colors cursor-pointer"
                                       style={
                                         saveStatus[stavka.key] === "error"
-                                          ? {
-                                              backgroundColor:
-                                                "rgb(254 242 242)",
-                                            }
+                                          ? { backgroundColor: "rgb(254 242 242)" }
                                           : saveStatus[stavka.key] === "ok"
-                                            ? {
-                                                backgroundColor: `${SECONDARY}22`,
-                                              }
-                                            : undefined
+                                            ? { backgroundColor: `${SECONDARY}22` }
+                                            : isUPripremiS
+                                              ? { backgroundColor: "rgb(255 251 235)" }
+                                              : undefined
                                       }
                                       onClick={() => {
-                                        const hasVal =
-                                          spremljeno[stavka.key] &&
-                                          spremljeno[stavka.key] !== "-1.000";
+                                        const hasVal = spremljeno[stavka.key] && spremljeno[stavka.key] !== "-1.000";
                                         if (hasVal) setConfirmKey(stavka.key);
-                                        else
-                                          inputRefs.current
-                                            .get(stavka.key)
-                                            ?.focus();
+                                        else inputRefs.current.get(stavka.key)?.focus();
                                       }}
                                     >
-                                      <td className="px-6 py-4 text-sm text-gray-900 align-top">
-                                        <div>{stavka.partner_name}</div>
+                                      <td className="px-4 py-3 text-sm text-gray-900 align-top">
+                                        <div className="font-semibold">{stavka.partner_name}</div>
                                         {stavka.branch_name && (
-                                          <div className="text-xs text-gray-500 mt-0.5">
-                                            {stavka.branch_name}
+                                          <div className="text-xs text-gray-500 mt-0.5">{stavka.branch_name}</div>
+                                        )}
+                                        {stavka.datum_dostave && (
+                                          <div className="text-xs mt-1" style={{ color: PRIMARY }}>
+                                            {formatDate(stavka.datum_dostave)}
                                           </div>
                                         )}
-                                        {stavka.partner_order_number && (
-                                          <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-400">
-                                            <span>Nar. par.:</span>
-                                            <span className="font-semibold text-gray-600">
-                                              {stavka.partner_order_number}
-                                            </span>
-                                            {stavka.partner_order_date && (
-                                              <span className="text-gray-400">
-                                                {formatDate(stavka.partner_order_date)}
-                                              </span>
+                                        {isUPripremiS && (
+                                          <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
+                                            {zsS === "saving" ? (
+                                              <div className="flex items-center gap-1 text-xs text-amber-700">
+                                                <Loader className="w-3 h-3 animate-spin" />
+                                                <span>Ažuriranje...</span>
+                                              </div>
+                                            ) : zsS === "ok" ? (
+                                              <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: SECONDARY }}>
+                                                <CheckCircle2 className="w-3 h-3" />
+                                                <span>Ažurirano</span>
+                                              </div>
+                                            ) : (
+                                              <button type="button"
+                                                onClick={() => void handleZakljuciStavku(stavka.item)}
+                                                className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg font-bold transition-all active:scale-95"
+                                                style={{ backgroundColor: "rgb(254 243 199)", color: "rgb(146 64 14)", border: "1px solid rgb(251 191 36)" }}>
+                                                <RefreshCw className="w-3 h-3" />
+                                                Ažuriraj
+                                              </button>
                                             )}
                                           </div>
                                         )}
                                       </td>
-                                      <td className="px-2 py-4 align-top">
-                                        {stavka.datum_dostave && (
-                                          <span
-                                            className="flex items-center gap-1 text-xs px-2 py-1 rounded-full font-semibold w-fit"
-                                            style={{
-                                              background: `${PRIMARY}15`,
-                                              color: PRIMARY,
-                                            }}
-                                          >
-                                            <Calendar className="w-3 h-3" />
-                                            {formatDate(stavka.datum_dostave)}
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td className="px-2 py-4 whitespace-nowrap text-sm font-semibold align-top text-right">
-                                        {stavka.item.remaining_quantity !==
-                                        undefined ? (
+                                      <td className="px-2 py-3 whitespace-nowrap text-sm font-semibold align-top text-right">
+                                        {stavka.item.remaining_quantity !== undefined ? (
                                           <div className="flex flex-col items-end gap-0.5">
-                                            <span
-                                              style={{
-                                                color: "rgb(146 64 14)",
-                                              }}
-                                            >
-                                              {stavka.item.remaining_quantity}
-                                            </span>
-                                            <span className="text-xs text-gray-400 font-normal">
-                                              /{stavka.item.quantity}
-                                            </span>
+                                            <span style={{ color: "rgb(146 64 14)" }}>{formatKolicina(stavka.item.remaining_quantity)}</span>
+                                            <span className="text-xs text-gray-400 font-normal">/{formatKolicina(stavka.item.quantity)}</span>
                                           </div>
                                         ) : (
-                                          <span style={{ color: SECONDARY }}>
-                                            {stavka.item.quantity}
-                                          </span>
+                                          <span style={{ color: SECONDARY }}>{formatKolicina(stavka.item.quantity)}</span>
                                         )}
                                       </td>
-                                      <td
-                                        className="px-4 py-3 align-top"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        {renderInput(
-                                          stavka.key,
-                                          stavka.item,
-                                          `${stavka.partner_name} — ${proizvod.product_name}`,
-                                        )}
+                                      <td className="px-4 py-3 align-top" onClick={(e) => e.stopPropagation()}>
+                                        {renderInput(stavka.key, stavka.item, `${stavka.partner_name} — ${proizvod.product_name}`)}
                                       </td>
                                     </tr>
-                                  ))}
+                                    );
+                                  })}
                                 </tbody>
                               </table>
                             </div>
