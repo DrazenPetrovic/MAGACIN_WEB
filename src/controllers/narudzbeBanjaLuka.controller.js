@@ -57,16 +57,16 @@ export const pokreniPripremu = async (req, res) => {
 // Dodaje pripremljenu količinu na stavku — poziva sp_prepare_order
 export const azurirajLokalno = async (req, res) => {
   try {
-    const { preparation_id, prepared_quantity, notes } = req.body;
+    const { preparation_id, prepared_quantity, notes, force = false } = req.body;
     const prepared_by = req.user?.sifraRadnika;
-    console.log('[azuriraj] body:', { preparation_id, prepared_quantity, prepared_by });
+    console.log('[azuriraj] body:', { preparation_id, prepared_quantity, prepared_by, force });
     if (!preparation_id || prepared_quantity === undefined || prepared_quantity === null || !prepared_by) {
       return res.status(400).json({
         success: false,
         message: 'preparation_id i prepared_quantity su obavezni, korisnik nije autentificiran',
       });
     }
-    const out = await LokalService.addPreparedQuantity(preparation_id, prepared_quantity, prepared_by, notes ?? null);
+    const out = await LokalService.addPreparedQuantity(preparation_id, prepared_quantity, prepared_by, notes ?? null, force ? 1 : 0);
     console.log('[azuriraj] SP result:', out);
     return res.json({ success: out.result === 1, message: out.message });
   } catch (error) {

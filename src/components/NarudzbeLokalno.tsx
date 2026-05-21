@@ -26,6 +26,9 @@ const SECONDARY = theme.secondary;
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3005";
 const isAndroid = Capacitor.getPlatform() === "android";
 
+// Upozorenje kada je unesena količina veća od naručene za ovaj procenat (npr. 0.30 = 30%)
+const PREKORACENJE_PRAG = 0.30;
+
 // ===== INTERFEJSI =====
 
 // Standardizovani format za prikaz
@@ -233,43 +236,64 @@ export function NarudzbeLokalno({ onBack }: Props) {
   >({});
 
   const handleZakljuciPripremu = async (nar: LokalnaNarudzba) => {
-    setZakljuciStatus((p) => ({ ...p, [nar.order_id]: "saving" }));
+    // Pre-kolektuj sve stavke za snimanje sa vrijednostima iz trenutnog statea
+    type SaveItem = { item: LokalniProizvod; key: string; parsed: number; note: string | null };
+    const saveItems: SaveItem[] = [];
+    const prekoracene: { naziv: string; originalnaKolicina: number; vecPripremljeno: number; uneseno: number; ukupno: number; procenat: number }[] = [];
 
     for (const item of nar.items) {
-      if (!item.preparation_id) continue;
-      // Preskači samo "ready" — "unavailable" se može ponovo ažurirati ako korisnik unese novu vrijednost
-      if (item.order_status === "ready") continue;
-
+      if (!item.preparation_id || item.order_status === "ready") continue;
       const key = rowKey(item.item_id);
       const val = spremljeno[key];
-
       // Preskači stavke bez unesene vrijednosti — procedura ne prihvata 0 ni prazno
       if (!val || val === "-1.000") continue;
       const parsed = parseFloat(val.replace(",", "."));
       if (isNaN(parsed) || parsed <= 0) continue;
-      const quantityToSend = parsed;
-
-      const res = await apiFetch(`${API_URL}/api/narudzbe-lokalno/azuriraj`, {
-        method: "POST",
-        body: JSON.stringify({
-          preparation_id: item.preparation_id,
-          prepared_quantity: quantityToSend,
-          notes: napomenaOp[key] || null,
-        }),
-      }).catch(() => null);
-
-      const resData = res ? await res.json().catch(() => null) : null;
-      if (resData?.success) {
-        setSpremljeno((p) => ({ ...p, [key]: "-1.000" }));
+      saveItems.push({ item, key, parsed, note: napomenaOp[key] || null });
+      const vecPripremljeno = Number(item.prepared_quantity ?? 0);
+      const ukupno = vecPripremljeno + parsed;
+      if (ukupno > item.quantity * (1 + PREKORACENJE_PRAG)) {
+        prekoracene.push({
+          naziv: item.product_name,
+          originalnaKolicina: item.quantity,
+          vecPripremljeno,
+          uneseno: parsed,
+          ukupno,
+          procenat: Math.round((ukupno / item.quantity - 1) * 100),
+        });
       }
     }
 
-    setZakljuciStatus((p) => ({ ...p, [nar.order_id]: "ok" }));
-    await fetchNarudzbe(true);
-    setTimeout(
-      () => setZakljuciStatus((p) => ({ ...p, [nar.order_id]: "idle" })),
-      2000,
-    );
+    const doSave = async (force = false) => {
+      setZakljuciStatus((p) => ({ ...p, [nar.order_id]: "saving" }));
+      for (const { item, key, parsed, note } of saveItems) {
+        const res = await apiFetch(`${API_URL}/api/narudzbe-lokalno/azuriraj`, {
+          method: "POST",
+          body: JSON.stringify({
+            preparation_id: item.preparation_id,
+            prepared_quantity: parsed,
+            notes: note,
+            force,
+          }),
+        }).catch(() => null);
+        const resData = res ? await res.json().catch(() => null) : null;
+        if (resData?.success) {
+          setSpremljeno((p) => ({ ...p, [key]: "-1.000" }));
+        }
+      }
+      setZakljuciStatus((p) => ({ ...p, [nar.order_id]: "ok" }));
+      await fetchNarudzbe(true);
+      setTimeout(() => setZakljuciStatus((p) => ({ ...p, [nar.order_id]: "idle" })), 2000);
+    };
+
+    if (prekoracene.length > 0) {
+      setPrekoracenjeModal({
+        stavke: prekoracene,
+        onConfirm: () => { setPrekoracenjeModal(null); void doSave(true); },
+      });
+    } else {
+      await doSave(false);
+    }
   };
 
   const handleZakljuciStavku = async (item: LokalniProizvod) => {
@@ -279,20 +303,43 @@ export function NarudzbeLokalno({ onBack }: Props) {
     if (!val || val === "-1.000") return;
     const parsed = parseFloat(val.replace(",", "."));
     if (isNaN(parsed) || parsed <= 0) return;
-    setZakljuciStatus((p) => ({ ...p, [item.order_id]: "saving" }));
-    const res = await apiFetch(`${API_URL}/api/narudzbe-lokalno/azuriraj`, {
-      method: "POST",
-      body: JSON.stringify({
-        preparation_id: item.preparation_id,
-        prepared_quantity: parsed,
-        notes: napomenaOp[key] || null,
-      }),
-    }).catch(() => null);
-    const resData = res ? await res.json().catch(() => null) : null;
-    if (resData?.success) setSpremljeno((p) => ({ ...p, [key]: "-1.000" }));
-    setZakljuciStatus((p) => ({ ...p, [item.order_id]: "ok" }));
-    await fetchNarudzbe(true);
-    setTimeout(() => setZakljuciStatus((p) => ({ ...p, [item.order_id]: "idle" })), 2000);
+    const note = napomenaOp[key] || null;
+
+    const doSave = async (force = false) => {
+      setZakljuciStatus((p) => ({ ...p, [item.order_id]: "saving" }));
+      const res = await apiFetch(`${API_URL}/api/narudzbe-lokalno/azuriraj`, {
+        method: "POST",
+        body: JSON.stringify({
+          preparation_id: item.preparation_id,
+          prepared_quantity: parsed,
+          notes: note,
+          force,
+        }),
+      }).catch(() => null);
+      const resData = res ? await res.json().catch(() => null) : null;
+      if (resData?.success) setSpremljeno((p) => ({ ...p, [key]: "-1.000" }));
+      setZakljuciStatus((p) => ({ ...p, [item.order_id]: "ok" }));
+      await fetchNarudzbe(true);
+      setTimeout(() => setZakljuciStatus((p) => ({ ...p, [item.order_id]: "idle" })), 2000);
+    };
+
+    const vecPripremljeno = item.prepared_quantity ?? 0;
+    const ukupno = vecPripremljeno + parsed;
+    if (ukupno > item.quantity * (1 + PREKORACENJE_PRAG)) {
+      setPrekoracenjeModal({
+        stavke: [{
+          naziv: item.product_name,
+          originalnaKolicina: item.quantity,
+          vecPripremljeno,
+          uneseno: parsed,
+          ukupno,
+          procenat: Math.round((ukupno / item.quantity - 1) * 100),
+        }],
+        onConfirm: () => { setPrekoracenjeModal(null); void doSave(true); },
+      });
+    } else {
+      await doSave(false);
+    }
   };
 
   const handlePokreniPripremu = async (orderId: number) => {
@@ -338,6 +385,17 @@ export function NarudzbeLokalno({ onBack }: Props) {
     item: LokalniProizvod;
   } | null>(null);
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
+  const [prekoracenjeModal, setPrekoracenjeModal] = useState<{
+    stavke: {
+      naziv: string;
+      originalnaKolicina: number;
+      vecPripremljeno: number;
+      uneseno: number;
+      ukupno: number;
+      procenat: number;
+    }[];
+    onConfirm: () => void;
+  } | null>(null);
   const [monitorBanner, setMonitorBanner] = useState<{
     text: string;
     ts: number;
@@ -1470,6 +1528,90 @@ export function NarudzbeLokalno({ onBack }: Props) {
                 }}
               >
                 Sačuvaj
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Modal: prekoračenje količine ──────────────────────────────────── */}
+      {prekoracenjeModal !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col overflow-hidden">
+            {/* Zaglavlje */}
+            <div
+              className="px-6 py-4 flex items-center gap-3"
+              style={{ background: "rgb(255 237 213)", borderBottom: "2px solid rgb(253 186 116)" }}
+            >
+              <span className="text-2xl">⚠</span>
+              <div>
+                <p className="text-sm font-bold" style={{ color: "rgb(154 52 18)" }}>
+                  UPOZORENJE — PREKORAČENJE KOLIČINE
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: "rgb(194 65 12)" }}>
+                  Unesena količina premašuje narudžbu za više od {Math.round(PREKORACENJE_PRAG * 100)}%
+                </p>
+              </div>
+            </div>
+            {/* Lista stavki */}
+            <div className="px-6 py-4 flex flex-col gap-2">
+              {prekoracenjeModal.stavke.map((s, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl px-4 py-3 text-sm"
+                  style={{ background: "rgb(255 247 237)", border: "1px solid rgb(253 186 116)" }}
+                >
+                  <p className="font-semibold text-gray-800 mb-2">{s.naziv}</p>
+                  <div className="flex flex-col gap-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Naručeno:</span>
+                      <span className="font-bold text-gray-700">{formatKolicina(s.originalnaKolicina)}</span>
+                    </div>
+                    {s.vecPripremljeno > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Već pripremljeno:</span>
+                        <span className="font-bold text-gray-700">{formatKolicina(s.vecPripremljeno)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Uneseno sada:</span>
+                      <span className="font-bold" style={{ color: "rgb(194 65 12)" }}>{formatKolicina(s.uneseno)}</span>
+                    </div>
+                    <div className="flex justify-between pt-1 border-t border-orange-200">
+                      <span className="text-gray-500">Ukupno ide kupcu:</span>
+                      <span className="font-bold" style={{ color: "rgb(154 52 18)" }}>{formatKolicina(s.ukupno)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500">Prekoračenje narudžbe:</span>
+                      <span
+                        className="font-bold px-2 py-0.5 rounded-lg"
+                        style={{ background: "rgb(254 215 170)", color: "rgb(154 52 18)" }}
+                      >
+                        +{s.procenat}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <p className="text-sm text-gray-600 mt-2 text-center">
+                Da li želite nastaviti sa snimanjem?
+              </p>
+            </div>
+            {/* Dugmad */}
+            <div className="flex gap-3 px-6 pb-6">
+              <button
+                className="flex-1 py-3 rounded-xl font-bold text-white transition-all active:scale-95"
+                style={{ backgroundColor: "rgb(234 88 12)" }}
+                onClick={prekoracenjeModal.onConfirm}
+              >
+                DA
+              </button>
+              <button
+                className="flex-1 py-3 rounded-xl font-bold transition-all active:scale-95 border-2"
+                style={{ color: PRIMARY, borderColor: PRIMARY }}
+                onClick={() => setPrekoracenjeModal(null)}
+              >
+                NE
               </button>
             </div>
           </div>
