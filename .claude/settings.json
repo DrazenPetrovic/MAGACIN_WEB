@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\" /b)",
+      "Bash(ls \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\\\\dist\\\\assets\" | sort > /tmp/dist_assets.txt && ls \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\\\\android\\\\app\\\\src\\\\main\\\\assets\\\\public\\\\assets\" | sort > /tmp/android_assets.txt && diff /tmp/dist_assets.txt /tmp/android_assets.txt && echo \"ISTI\" || echo \"RAZLIKA POSTOJI\")",
+      "Read(//tmp/**)",
+      "Bash(git -C \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\" log --oneline -8)",
+      "Bash(git -C \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\" diff --stat HEAD)",
+      "Bash(git -C \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\" status --short)",
+      "Bash(cp \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\\\\public\\\\foto\\\\IKONA.png\" \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\\\\public\\\\IKONA.png\" && echo \"OK\")"
+    ],
+    "additionalDirectories": [
+      "d:\\WEB_KOMERCIJALA\\MAGACIN_WEB\\public\\foto"
+    ]
+  }
+}
