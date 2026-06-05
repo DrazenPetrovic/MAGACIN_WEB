@@ -957,10 +957,10 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                       el,
                                                     )
                                                   }
-                                                  type="text"
+                                                  type="number"
+                                                  step="any"
                                                   inputMode="decimal"
-                                                  pattern="[0-9.]*"
-                                                  value={spremljeno[key] ?? ""}
+                                                  value={spremljeno[key] === "-1.000" ? "" : (spremljeno[key] ?? "")}
                                                   onChange={(e) =>
                                                     handleSpremljenoChange(
                                                       key,
@@ -1273,12 +1273,11 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                     el,
                                                   )
                                                 }
-                                                type="text"
+                                                type="number"
+                                                step="any"
                                                 inputMode="decimal"
-                                                pattern="[0-9.]*"
                                                 value={
-                                                  spremljeno[stavka.key] ??
-                                                  "-1.000"
+                                                  spremljeno[stavka.key] === "-1.000" ? "" : (spremljeno[stavka.key] ?? "")
                                                 }
                                                 onChange={(e) =>
                                                   handleSpremljenoChange(
