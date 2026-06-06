@@ -62,7 +62,7 @@ export function LoginPanel({ onLoginSuccess }: LoginPanelProps) {
             <div className="px-8 pt-8 pb-7 text-center">
               <div className="flex justify-center mb-4">
                 <img
-                  src="/foto/karpas_logo_software.png"
+                  src="/foto/IKONA.png"
                   alt="Karpas Logo"
                   className="h-24 object-contain"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
@@ -106,7 +106,7 @@ export function LoginPanel({ onLoginSuccess }: LoginPanelProps) {
           <div className="flex justify-center mb-3">
             <div className="w-24 h-24 flex items-center justify-center">
               <img
-                src="/foto/karpas_logo_software.png"
+                src="/foto/IKONA.png"
                 alt="Karpas Logo"
                 className="w-full h-full object-contain"
                 onError={(e) => {

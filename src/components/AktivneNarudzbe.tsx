@@ -144,10 +144,17 @@ export function AktivneNarudzbe({ onBack }: Props) {
     sifra_tabele?: number;
   } | null>(null);
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
+  const [expandedKupci, setExpandedKupci] = useState<Record<string, boolean>>({});
+  const [expandedProizvodi, setExpandedProizvodi] = useState<Record<string, boolean>>({});
   const inputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map());
 
   const rowKey = (kupacKey: string, sif: string, idx: number) =>
     `${kupacKey}::${sif}::${idx}`;
+
+  const isKupacExpanded = (key: string) => expandedKupci[key] !== false;
+  const isProizvodExpanded = (sif: string) => expandedProizvodi[sif] === true;
+  const toggleKupac = (key: string) => setExpandedKupci(p => ({ ...p, [key]: !isKupacExpanded(key) }));
+  const toggleProizvod = (sif: string) => setExpandedProizvodi(p => ({ ...p, [sif]: !isProizvodExpanded(sif) }));
 
   const handleSpremljenoChange = (key: string, raw: string) => {
     const clean = raw.replace(",", ".").replace(/[^0-9.]/g, "");
@@ -196,8 +203,9 @@ export function AktivneNarudzbe({ onBack }: Props) {
     key: string,
     sifraTabele: number | undefined,
     napomena: string | undefined,
+    overrideVal?: string,
   ) => {
-    const val = spremljeno[key];
+    const val = overrideVal ?? spremljeno[key];
     if (!val || val === "-1.000" || !sifraTabele) return;
     const kolicina = parseFloat(val.replace(",", "."));
     if (isNaN(kolicina)) return;
@@ -753,25 +761,16 @@ export function AktivneNarudzbe({ onBack }: Props) {
                   ) : viewMode === "po-kupcu" ? (
                     <div className="space-y-6">
                       {sortedNarudzbePoKupcu.map((kupac) => {
+                        const kupacKey = getKupacGroupingKey(kupac.sifra_kupca, kupac.referentni_broj);
                         const allFilled =
                           kupac.proizvodi.length > 0 &&
                           kupac.proizvodi.every((p, idx) => {
-                            const k = rowKey(
-                              getKupacGroupingKey(
-                                kupac.sifra_kupca,
-                                kupac.referentni_broj,
-                              ),
-                              p.sif,
-                              idx,
-                            );
+                            const k = rowKey(kupacKey, p.sif, idx);
                             return saveStatus[k] === "ok";
                           });
                         return (
                           <div
-                            key={getKupacGroupingKey(
-                              kupac.sifra_kupca,
-                              kupac.referentni_broj,
-                            )}
+                            key={kupacKey}
                             className="bg-white rounded-xl shadow-lg overflow-hidden transition-all"
                             style={{
                               border: "2px solid rgb(229 231 235)",
@@ -780,28 +779,29 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                 : undefined,
                             }}
                           >
-                            {/* ─── Zaglavlje kupca (identično KOMERCIJALA, drugačije boje) ─── */}
+                            {/* ─── Zaglavlje kupca ─── */}
                             <div
-                              className="px-6 py-4 border-b-2 border-gray-200"
+                              className="px-6 py-4 border-b-2 border-gray-200 cursor-pointer select-none"
                               style={{
                                 background: `linear-gradient(to right, ${PRIMARY}18, ${SECONDARY}18)`,
                               }}
+                              onClick={() => toggleKupac(kupacKey)}
                             >
-                              <div className="flex items-center">
-                                <div className="flex items-baseline gap-3 flex-wrap">
+                              <div className="flex items-center gap-3" style={{ outline: "2px dashed red" }}>
+                                <div className="flex items-baseline gap-3 flex-wrap flex-1" style={{ outline: "2px dashed blue" }}>
                                   <h3
                                     className="text-xl font-bold"
-                                    style={{ color: PRIMARY }}
+                                    style={{ color: PRIMARY, outline: "2px dashed green" }}
                                   >
                                     {kupac.naziv_kupca}
                                   </h3>
                                   {kupac.naziv_grada && (
-                                    <span className="text-xs text-gray-500 font-medium">
+                                    <span className="text-xs text-gray-500 font-medium" style={{ outline: "2px dashed orange" }}>
                                       {kupac.naziv_grada}
                                     </span>
                                   )}
                                 </div>
-                                <div className="ml-auto bg-white px-4 py-2 rounded-lg shadow">
+                                <div className="bg-white px-4 py-2 rounded-lg shadow flex-none" style={{ outline: "2px dashed purple" }}>
                                   <span className="text-sm text-gray-600">
                                     Ukupno stavki:
                                   </span>
@@ -812,10 +812,19 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                     {kupac.proizvodi.length}
                                   </span>
                                 </div>
+                                <ChevronDown
+                                  className="w-5 h-5 flex-none transition-transform duration-200"
+                                  style={{
+                                    color: PRIMARY,
+                                    transform: isKupacExpanded(kupacKey) ? "rotate(0deg)" : "rotate(-90deg)",
+                                    outline: "2px dashed teal",
+                                  }}
+                                />
                               </div>
                             </div>
 
                             {/* ─── Tabela sa proizvodima ─── */}
+                            {isKupacExpanded(kupacKey) && (
                             <div className="overflow-x-auto">
                               <table className="w-full table-fixed divide-y divide-gray-200">
                                 <thead
@@ -837,18 +846,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                       NAZIV PROIZVODA
                                     </th>
                                     <th
-                                      className="px-2 py-3 text-right text-xs font-medium uppercase tracking-wider"
-                                      style={{
-                                        color: allFilled
-                                          ? SECONDARY
-                                          : "rgb(107 114 128)",
-                                        width: 52,
-                                      }}
-                                    >
-                                      JM
-                                    </th>
-                                    <th
-                                      className="px-2 py-3 text-right text-xs font-medium uppercase tracking-wider"
+                                      className="px-2 py-3 text-center text-xs font-medium uppercase tracking-wider"
                                       style={{
                                         color: allFilled
                                           ? SECONDARY
@@ -875,7 +873,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                   {kupac.proizvodi.length === 0 ? (
                                     <tr>
                                       <td
-                                        colSpan={4}
+                                        colSpan={3}
                                         className="px-6 py-8 text-center text-gray-500"
                                       >
                                         Nema proizvoda
@@ -883,14 +881,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                     </tr>
                                   ) : (
                                     kupac.proizvodi.map((proizvod, index) => {
-                                      const key = rowKey(
-                                        getKupacGroupingKey(
-                                          kupac.sifra_kupca,
-                                          kupac.referentni_broj,
-                                        ),
-                                        proizvod.sif,
-                                        index,
-                                      );
+                                      const key = rowKey(kupacKey, proizvod.sif, index);
                                       const isListening = voiceKey === key;
                                       return (
                                         <tr
@@ -919,9 +910,10 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                 ?.focus();
                                           }}
                                         >
-                                          <td className="px-6 py-4 text-sm text-gray-900 align-top">
-                                            <div>
+                                          <td className="px-6 py-4 text-sm text-gray-900 align-top" style={{ outline: "2px dashed red" }}>
+                                            <div style={{ outline: "2px dashed green" }}>
                                               {proizvod.naziv_proizvoda}
+                                              <span className="text-xs font-bold ml-1" style={{ color: PRIMARY, outline: "2px dashed orange" }}>({proizvod.jm})</span>
                                             </div>
                                             {proizvod.napomena &&
                                               proizvod.napomena.trim() &&
@@ -929,27 +921,42 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                 "-" && (
                                                 <div
                                                   className="mt-1 text-xs italic"
-                                                  style={{ color: SECONDARY }}
+                                                  style={{ color: SECONDARY, outline: "2px dashed pink" }}
                                                 >
                                                   {proizvod.napomena.trim()}
                                                 </div>
                                               )}
                                           </td>
-                                          <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-900 align-top text-right">
-                                            {proizvod.jm}
-                                          </td>
                                           <td
-                                            className="px-2 py-4 whitespace-nowrap text-sm font-semibold align-top text-right"
-                                            style={{ color: SECONDARY }}
+                                            className="px-2 py-4 whitespace-nowrap align-top text-center"
+                                            style={{ outline: "2px dashed blue" }}
                                           >
-                                            {proizvod.kolicina}
+                                            {proizvod.jm.toLowerCase() !== "kg" ? (
+                                              <span
+                                                className="inline-block text-base font-bold px-3 py-3 rounded-lg cursor-pointer active:scale-95 transition-transform"
+                                                style={{ backgroundColor: `${SECONDARY}22`, color: SECONDARY, outline: "2px dashed navy" }}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  const val = String(proizvod.kolicina);
+                                                  setSpremljeno(p => ({ ...p, [key]: val }));
+                                                  handleSpremljenoBlur(key, proizvod.sifra_tabele, napomenaOp[key], val);
+                                                }}
+                                              >
+                                                {proizvod.kolicina}
+                                              </span>
+                                            ) : (
+                                              <span className="text-sm font-semibold" style={{ color: SECONDARY, outline: "2px dashed navy" }}>
+                                                {proizvod.kolicina}
+                                              </span>
+                                            )}
                                           </td>
                                           <td
                                             className="px-4 py-3 align-top"
                                             onClick={(e) => e.stopPropagation()}
+                                            style={{ outline: "2px dashed purple" }}
                                           >
-                                            <div className="flex flex-col items-end gap-1">
-                                              <div className="flex items-center gap-1">
+                                            <div className="flex flex-col items-end gap-1" style={{ outline: "2px dashed teal" }}>
+                                              <div className="flex items-center gap-1" style={{ outline: "2px dashed magenta" }}>
                                                 <input
                                                   ref={(el) =>
                                                     inputRefs.current.set(
@@ -970,6 +977,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                   placeholder="-1.000"
                                                   className="w-24 text-right text-sm font-bold border-2 rounded-lg px-2 py-2 focus:outline-none transition"
                                                   style={{
+                                                    outline: "2px dashed red",
                                                     borderColor:
                                                       saveStatus[key] ===
                                                       "error"
@@ -1027,6 +1035,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                   }
                                                   className="p-2 rounded-lg transition-all"
                                                   style={{
+                                                    outline: "2px dashed green",
                                                     backgroundColor: isListening
                                                       ? "#fee2e2"
                                                       : `${PRIMARY}18`,
@@ -1067,6 +1076,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                 }
                                                 className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all self-end"
                                                 style={{
+                                                  outline: "2px dashed blue",
                                                   backgroundColor: napomenaOp[
                                                     key
                                                   ]
@@ -1091,6 +1101,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                 </tbody>
                               </table>
                             </div>
+                            )}
                           </div>
                         );
                       })}
@@ -1114,30 +1125,20 @@ export function AktivneNarudzbe({ onBack }: Props) {
                           >
                             {/* Zaglavlje proizvoda */}
                             <div
-                              className="px-6 py-4 border-b-2 border-gray-200"
+                              className="px-6 py-4 border-b-2 border-gray-200 cursor-pointer select-none"
                               style={{
                                 background: `linear-gradient(to right, ${PRIMARY}18, ${SECONDARY}18)`,
                               }}
+                              onClick={() => toggleProizvod(proizvod.sif)}
                             >
-                              <div className="flex items-center">
-                                <div className="flex items-baseline gap-3 flex-wrap">
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-baseline gap-3 flex-wrap flex-1">
                                   <h3
                                     className="text-xl font-bold"
                                     style={{ color: PRIMARY }}
                                   >
                                     {proizvod.naziv}
                                   </h3>
-                                  <span className="text-xs text-gray-600">
-                                    Šifra:{" "}
-                                    <span className="font-semibold">
-                                      {proizvod.sif}
-                                    </span>
-                                    {proizvod.sifra_tabele && (
-                                      <span className="text-gray-400 ml-1">
-                                        ({proizvod.sifra_tabele})
-                                      </span>
-                                    )}
-                                  </span>
                                   <span className="text-xs text-gray-500">
                                     JM:{" "}
                                     <span className="font-semibold text-gray-700">
@@ -1145,7 +1146,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                     </span>
                                   </span>
                                 </div>
-                                <div className="ml-auto bg-white px-4 py-2 rounded-lg shadow">
+                                <div className="bg-white px-4 py-2 rounded-lg shadow flex-none">
                                   <span className="text-sm text-gray-600">
                                     Kupaca:
                                   </span>
@@ -1156,10 +1157,18 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                     {proizvod.stavke.length}
                                   </span>
                                 </div>
+                                <ChevronDown
+                                  className="w-5 h-5 flex-none transition-transform duration-200"
+                                  style={{
+                                    color: PRIMARY,
+                                    transform: isProizvodExpanded(proizvod.sif) ? "rotate(0deg)" : "rotate(-90deg)",
+                                  }}
+                                />
                               </div>
                             </div>
 
                             {/* Tabela kupaca */}
+                            {isProizvodExpanded(proizvod.sif) && (
                             <div className="overflow-x-auto">
                               <table className="w-full table-fixed divide-y divide-gray-200">
                                 <thead
@@ -1181,7 +1190,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                       KUPAC
                                     </th>
                                     <th
-                                      className="px-2 py-3 text-right text-xs font-medium uppercase tracking-wider"
+                                      className="px-2 py-3 text-center text-xs font-medium uppercase tracking-wider"
                                       style={{
                                         color: allFilledP
                                           ? SECONDARY
@@ -1255,7 +1264,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                             )}
                                         </td>
                                         <td
-                                          className="px-2 py-4 whitespace-nowrap text-sm font-semibold align-top text-right"
+                                          className="px-2 py-4 whitespace-nowrap text-sm font-semibold align-top text-center"
                                           style={{ color: SECONDARY }}
                                         >
                                           {stavka.kolicina}
@@ -1411,6 +1420,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                 </tbody>
                               </table>
                             </div>
+                            )}
                           </div>
                         );
                       })}
