@@ -8,6 +8,7 @@ import {
   X,
   CheckCircle2,
   XCircle,
+  Search,
 } from "lucide-react";
 import { theme } from "../theme";
 import { apiFetch } from "../utils/apiFetch";
@@ -146,10 +147,31 @@ export function AktivneNarudzbe({ onBack }: Props) {
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
   const [expandedKupci, setExpandedKupci] = useState<Record<string, boolean>>({});
   const [expandedProizvodi, setExpandedProizvodi] = useState<Record<string, boolean>>({});
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchListening, setSearchListening] = useState(false);
   const inputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map());
 
   const rowKey = (kupacKey: string, sif: string, idx: number) =>
     `${kupacKey}::${sif}::${idx}`;
+
+  const startSearchVoice = () => {
+    const SRCtor = getSpeechRecognition();
+    if (!SRCtor) { alert("Preglednik ne podržava glasovni unos."); return; }
+    const rec = new SRCtor();
+    rec.lang = "bs-BA";
+    rec.continuous = false;
+    rec.interimResults = false;
+    setSearchListening(true);
+    rec.onresult = (e) => {
+      const text = e.results[0][0].transcript;
+      if (text) setSearchQuery(text);
+      setSearchListening(false);
+    };
+    rec.onerror = () => setSearchListening(false);
+    rec.onend = () => setSearchListening(false);
+    rec.start();
+  };
 
   const isKupacExpanded = (key: string) => expandedKupci[key] !== false;
   const isProizvodExpanded = (sif: string) => expandedProizvodi[sif] === true;
@@ -540,6 +562,12 @@ export function AktivneNarudzbe({ onBack }: Props) {
     );
   })();
 
+  const filteredProizvodi = searchQuery
+    ? proizvodiPoNazivu.filter(p =>
+        p.naziv.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : proizvodiPoNazivu;
+
   // ===== RENDER =====
   return (
     <div
@@ -656,6 +684,21 @@ export function AktivneNarudzbe({ onBack }: Props) {
                       Po proizvodu
                     </button>
                   </div>
+                  <button
+                    onClick={() => { setSearchModalOpen(true); setTimeout(startSearchVoice, 300); }}
+                    className="p-2 rounded-lg transition-all relative"
+                    style={{
+                      backgroundColor: searchQuery ? `${PRIMARY}22` : `${PRIMARY}10`,
+                      color: PRIMARY,
+                      visibility: viewMode === "po-proizvodu" ? "visible" : "hidden",
+                    }}
+                    title="Pretraga glasom"
+                  >
+                    <Search className="w-5 h-5" />
+                    {searchQuery && (
+                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SECONDARY }} />
+                    )}
+                  </button>
                   {totalProizvoda > 0 && (
                     <div
                       className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm"
@@ -787,21 +830,21 @@ export function AktivneNarudzbe({ onBack }: Props) {
                               }}
                               onClick={() => toggleKupac(kupacKey)}
                             >
-                              <div className="flex items-center gap-3" style={{ outline: "2px dashed red" }}>
-                                <div className="flex items-baseline gap-3 flex-wrap flex-1" style={{ outline: "2px dashed blue" }}>
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-baseline gap-3 flex-wrap flex-1">
                                   <h3
                                     className="text-xl font-bold"
-                                    style={{ color: PRIMARY, outline: "2px dashed green" }}
+                                    style={{ color: PRIMARY }}
                                   >
                                     {kupac.naziv_kupca}
                                   </h3>
                                   {kupac.naziv_grada && (
-                                    <span className="text-xs text-gray-500 font-medium" style={{ outline: "2px dashed orange" }}>
+                                    <span className="text-xs text-gray-500 font-medium">
                                       {kupac.naziv_grada}
                                     </span>
                                   )}
                                 </div>
-                                <div className="bg-white px-4 py-2 rounded-lg shadow flex-none" style={{ outline: "2px dashed purple" }}>
+                                <div className="bg-white px-4 py-2 rounded-lg shadow flex-none">
                                   <span className="text-sm text-gray-600">
                                     Ukupno stavki:
                                   </span>
@@ -817,7 +860,6 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                   style={{
                                     color: PRIMARY,
                                     transform: isKupacExpanded(kupacKey) ? "rotate(0deg)" : "rotate(-90deg)",
-                                    outline: "2px dashed teal",
                                   }}
                                 />
                               </div>
@@ -910,10 +952,10 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                 ?.focus();
                                           }}
                                         >
-                                          <td className="px-6 py-4 text-sm text-gray-900 align-top" style={{ outline: "2px dashed red" }}>
-                                            <div style={{ outline: "2px dashed green" }}>
+                                          <td className="px-6 py-4 text-sm text-gray-900 align-top">
+                                            <div>
                                               {proizvod.naziv_proizvoda}
-                                              <span className="text-xs font-bold ml-1" style={{ color: PRIMARY, outline: "2px dashed orange" }}>({proizvod.jm})</span>
+                                              <span className="text-xs font-bold ml-1" style={{ color: PRIMARY }}>({proizvod.jm})</span>
                                             </div>
                                             {proizvod.napomena &&
                                               proizvod.napomena.trim() &&
@@ -921,7 +963,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                 "-" && (
                                                 <div
                                                   className="mt-1 text-xs italic"
-                                                  style={{ color: SECONDARY, outline: "2px dashed pink" }}
+                                                  style={{ color: SECONDARY }}
                                                 >
                                                   {proizvod.napomena.trim()}
                                                 </div>
@@ -929,12 +971,11 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                           </td>
                                           <td
                                             className="px-2 py-4 whitespace-nowrap align-top text-center"
-                                            style={{ outline: "2px dashed blue" }}
                                           >
                                             {proizvod.jm.toLowerCase() !== "kg" ? (
                                               <span
                                                 className="inline-block text-base font-bold px-3 py-3 rounded-lg cursor-pointer active:scale-95 transition-transform"
-                                                style={{ backgroundColor: `${SECONDARY}22`, color: SECONDARY, outline: "2px dashed navy" }}
+                                                style={{ backgroundColor: `${SECONDARY}22`, color: SECONDARY }}
                                                 onClick={(e) => {
                                                   e.stopPropagation();
                                                   const val = String(proizvod.kolicina);
@@ -945,7 +986,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                 {proizvod.kolicina}
                                               </span>
                                             ) : (
-                                              <span className="text-sm font-semibold" style={{ color: SECONDARY, outline: "2px dashed navy" }}>
+                                              <span className="text-sm font-semibold" style={{ color: SECONDARY }}>
                                                 {proizvod.kolicina}
                                               </span>
                                             )}
@@ -953,10 +994,9 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                           <td
                                             className="px-4 py-3 align-top"
                                             onClick={(e) => e.stopPropagation()}
-                                            style={{ outline: "2px dashed purple" }}
                                           >
-                                            <div className="flex flex-col items-end gap-1" style={{ outline: "2px dashed teal" }}>
-                                              <div className="flex items-center gap-1" style={{ outline: "2px dashed magenta" }}>
+                                            <div className="flex flex-col items-end gap-1">
+                                              <div className="flex items-center gap-1">
                                                 <input
                                                   ref={(el) =>
                                                     inputRefs.current.set(
@@ -977,7 +1017,6 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                   placeholder="-1.000"
                                                   className="w-24 text-right text-sm font-bold border-2 rounded-lg px-2 py-2 focus:outline-none transition"
                                                   style={{
-                                                    outline: "2px dashed red",
                                                     borderColor:
                                                       saveStatus[key] ===
                                                       "error"
@@ -1035,7 +1074,6 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                   }
                                                   className="p-2 rounded-lg transition-all"
                                                   style={{
-                                                    outline: "2px dashed green",
                                                     backgroundColor: isListening
                                                       ? "#fee2e2"
                                                       : `${PRIMARY}18`,
@@ -1076,7 +1114,6 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                 }
                                                 className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all self-end"
                                                 style={{
-                                                  outline: "2px dashed blue",
                                                   backgroundColor: napomenaOp[
                                                     key
                                                   ]
@@ -1108,10 +1145,18 @@ export function AktivneNarudzbe({ onBack }: Props) {
                     </div>
                   ) : (
                     <div className="space-y-6">
-                      {proizvodiPoNazivu.map((proizvod) => {
+                      {filteredProizvodi.map((proizvod) => {
                         const allFilledP = proizvod.stavke.every(
                           (s) => saveStatus[s.key] === "ok",
                         );
+                        const totalKolicina = proizvod.stavke.reduce((sum, s) => sum + parseFloat(String(s.kolicina)), 0);
+                        const spremljenoKolicina = proizvod.stavke.reduce((sum, s) => {
+                          if (saveStatus[s.key] === "ok") {
+                            const val = parseFloat(String(spremljeno[s.key] ?? "0"));
+                            return sum + (isNaN(val) ? 0 : val);
+                          }
+                          return sum;
+                        }, 0);
                         return (
                           <div
                             key={proizvod.sif}
@@ -1132,29 +1177,31 @@ export function AktivneNarudzbe({ onBack }: Props) {
                               onClick={() => toggleProizvod(proizvod.sif)}
                             >
                               <div className="flex items-center gap-3">
-                                <div className="flex items-baseline gap-3 flex-wrap flex-1">
-                                  <h3
-                                    className="text-xl font-bold"
-                                    style={{ color: PRIMARY }}
-                                  >
-                                    {proizvod.naziv}
-                                  </h3>
-                                  <span className="text-xs text-gray-500">
-                                    JM:{" "}
-                                    <span className="font-semibold text-gray-700">
-                                      {proizvod.jm}
+                                <div className="flex flex-col gap-0.5 flex-1">
+                                  <div className="flex items-baseline gap-3 flex-wrap">
+                                    <h3
+                                      className="text-xl font-bold"
+                                      style={{ color: PRIMARY }}
+                                    >
+                                      {proizvod.naziv}
+                                    </h3>
+                                    <span className="text-xs text-gray-500">
+                                      JM:{" "}
+                                      <span className="font-semibold text-gray-700">
+                                        {proizvod.jm}
+                                      </span>
                                     </span>
+                                  </div>
+                                  <span className="text-xs text-gray-500">
+                                    Kupaca: {proizvod.stavke.length}
                                   </span>
                                 </div>
-                                <div className="bg-white px-4 py-2 rounded-lg shadow flex-none">
-                                  <span className="text-sm text-gray-600">
-                                    Kupaca:
-                                  </span>
+                                <div className="flex-none text-right">
                                   <span
-                                    className="ml-2 text-lg font-bold"
-                                    style={{ color: SECONDARY }}
+                                    className="text-base font-bold"
+                                    style={{ color: allFilledP ? SECONDARY : PRIMARY }}
                                   >
-                                    {proizvod.stavke.length}
+                                    {totalKolicina.toFixed(3)}/{spremljenoKolicina.toFixed(3)}
                                   </span>
                                 </div>
                                 <ChevronDown
@@ -1510,6 +1557,76 @@ export function AktivneNarudzbe({ onBack }: Props) {
                 }}
               >
                 Sačuvaj
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Modal: glasovna pretraga ────────────────────────────────────────── */}
+      {searchModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col items-center gap-5 px-8 py-7">
+            <div className="flex items-center justify-between w-full">
+              <p className="text-sm font-bold uppercase tracking-wide" style={{ color: PRIMARY }}>
+                Pretraga proizvoda
+              </p>
+              <button
+                onClick={() => setSearchModalOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-gray-100"
+                style={{ color: PRIMARY }}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Prikaz prepoznatog teksta */}
+            <div
+              className="w-full min-h-12 flex items-center justify-center rounded-xl px-4 py-3 text-center"
+              style={{ backgroundColor: `${PRIMARY}10`, border: `2px solid ${PRIMARY}22` }}
+            >
+              {searchQuery ? (
+                <span className="text-base font-semibold" style={{ color: PRIMARY }}>{searchQuery}</span>
+              ) : (
+                <span className="text-sm text-gray-400 italic">Govorite naziv proizvoda...</span>
+              )}
+            </div>
+
+            {/* Mic dugme */}
+            <button
+              onClick={startSearchVoice}
+              className="w-20 h-20 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-lg"
+              style={{
+                backgroundColor: searchListening ? "#fee2e2" : `${PRIMARY}18`,
+                border: `3px solid ${searchListening ? "#dc2626" : PRIMARY}`,
+              }}
+            >
+              <Mic
+                className={`w-9 h-9 ${searchListening ? "animate-pulse" : ""}`}
+                style={{ color: searchListening ? "#dc2626" : PRIMARY }}
+              />
+            </button>
+            <p className="text-sm font-medium -mt-2" style={{ color: searchListening ? "#dc2626" : "rgb(156 163 175)" }}>
+              {searchListening ? "Slušam..." : "Tapnite da pretražite"}
+            </p>
+
+            {/* Akcije */}
+            <div className="flex gap-3 w-full">
+              {searchQuery && (
+                <button
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all"
+                  style={{ color: PRIMARY, borderColor: PRIMARY }}
+                  onClick={() => { setSearchQuery(""); }}
+                >
+                  Obriši
+                </button>
+              )}
+              <button
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all"
+                style={{ backgroundColor: PRIMARY }}
+                onClick={() => setSearchModalOpen(false)}
+              >
+                Primijeni
               </button>
             </div>
           </div>
