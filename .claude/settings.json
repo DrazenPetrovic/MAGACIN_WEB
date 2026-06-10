@@ -7,7 +7,9 @@
       "Bash(git -C \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\" log --oneline -8)",
       "Bash(git -C \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\" diff --stat HEAD)",
       "Bash(git -C \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\" status --short)",
-      "Bash(cp \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\\\\public\\\\foto\\\\IKONA.png\" \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\\\\public\\\\IKONA.png\" && echo \"OK\")"
+      "Bash(cp \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\\\\public\\\\foto\\\\IKONA.png\" \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\\\\public\\\\IKONA.png\" && echo \"OK\")",
+      "PowerShell(Select-String -Path \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\\\\android\\\\app\\\\src\\\\main\\\\assets\\\\public\\\\assets\\\\index-BMVCvOeb.js\" -Pattern \"185\\\\.99\\\\.2\\\\.164|karpas\\\\.app|localhost:3005\" -AllMatches | ForEach-Object { $_.Matches | ForEach-Object { $_.Value } } | Sort-Object -Unique)",
+      "PowerShell($content = Get-Content \"d:\\\\WEB_KOMERCIJALA\\\\MAGACIN_WEB\\\\android\\\\app\\\\src\\\\main\\\\assets\\\\public\\\\assets\\\\index-BMVCvOeb.js\" -Raw; $matches = [regex]::Matches\\($content, '.{60}185\\\\.99\\\\.2\\\\.164.{60}'\\); $matches | ForEach-Object { $_.Value } | Select-Object -Unique)"
     ],
     "additionalDirectories": [
       "d:\\WEB_KOMERCIJALA\\MAGACIN_WEB\\public\\foto"
