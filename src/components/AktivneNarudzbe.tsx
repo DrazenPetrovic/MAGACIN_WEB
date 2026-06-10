@@ -3,6 +3,8 @@ import {
   ArrowLeft,
   Loader,
   ChevronDown,
+  ChevronsUp,
+  ChevronsDown,
   Mic,
   MessageSquare,
   X,
@@ -177,6 +179,30 @@ export function AktivneNarudzbe({ onBack }: Props) {
   const isProizvodExpanded = (sif: string) => expandedProizvodi[sif] === true;
   const toggleKupac = (key: string) => setExpandedKupci(p => ({ ...p, [key]: !isKupacExpanded(key) }));
   const toggleProizvod = (sif: string) => setExpandedProizvodi(p => ({ ...p, [sif]: !isProizvodExpanded(sif) }));
+
+  const handleCollapseExpandAll = () => {
+    if (viewMode === "po-kupcu") {
+      const allCollapsed = narudzbePoKupcu.every(
+        k => expandedKupci[getKupacGroupingKey(k.sifra_kupca, k.referentni_broj)] === false
+      );
+      if (allCollapsed) {
+        setExpandedKupci({});
+      } else {
+        const next: Record<string, boolean> = {};
+        narudzbePoKupcu.forEach(k => { next[getKupacGroupingKey(k.sifra_kupca, k.referentni_broj)] = false; });
+        setExpandedKupci(next);
+      }
+    } else {
+      const anyExpanded = filteredProizvodi.some(p => expandedProizvodi[p.sif] === true);
+      if (anyExpanded) {
+        setExpandedProizvodi({});
+      } else {
+        const next: Record<string, boolean> = {};
+        filteredProizvodi.forEach(p => { next[p.sif] = true; });
+        setExpandedProizvodi(next);
+      }
+    }
+  };
 
   const handleSpremljenoChange = (key: string, raw: string) => {
     const clean = raw.replace(",", ".").replace(/[^0-9.]/g, "");
@@ -579,9 +605,9 @@ export function AktivneNarudzbe({ onBack }: Props) {
         <div className="bg-white rounded-none md:rounded-2xl shadow-xl overflow-hidden flex flex-col h-full">
           {/* ─── HEADER — KOLAPSIBILAN (identično KOMERCIJALA) ──────────────── */}
           <div className="border-b-2 border-gray-200 bg-white flex-none">
-            <div className="flex items-center justify-between gap-3 px-6 md:px-8 py-2 md:py-4">
+            <div className="flex items-center justify-between gap-3 pl-2 pr-4 md:px-8 py-2 md:py-4">
               <>
-                  <div className="flex items-center gap-3 pl-6">
+                  <div className="flex items-center gap-3">
                     <button
                       onClick={onBack}
                       className="flex items-center justify-center w-8 h-8 rounded-lg border-2 transition-all active:scale-95"
@@ -656,33 +682,59 @@ export function AktivneNarudzbe({ onBack }: Props) {
                       )}
                     </div>
                   </div>
-                  <div
-                    className="flex rounded-lg overflow-hidden border-2 ml-2"
-                    style={{ borderColor: PRIMARY }}
-                  >
+                  <div className="flex items-center gap-1.5">
                     <button
-                      className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all"
-                      style={{
-                        backgroundColor:
-                          viewMode === "po-kupcu" ? PRIMARY : "transparent",
-                        color: viewMode === "po-kupcu" ? "white" : PRIMARY,
-                      }}
-                      onClick={() => setViewMode("po-kupcu")}
+                      onClick={handleCollapseExpandAll}
+                      className="flex items-center justify-center w-8 h-8 rounded-lg border-2 transition-all active:scale-95"
+                      style={{ color: PRIMARY, borderColor: PRIMARY }}
+                      title={
+                        viewMode === "po-kupcu"
+                          ? narudzbePoKupcu.every(k => expandedKupci[getKupacGroupingKey(k.sifra_kupca, k.referentni_broj)] === false)
+                            ? "Proširi sve"
+                            : "Kolabira sve"
+                          : filteredProizvodi.some(p => expandedProizvodi[p.sif] === true)
+                            ? "Kolabira sve"
+                            : "Proširi sve"
+                      }
                     >
-                      Po kupcu
+                      {viewMode === "po-kupcu"
+                        ? narudzbePoKupcu.every(k => expandedKupci[getKupacGroupingKey(k.sifra_kupca, k.referentni_broj)] === false)
+                          ? <ChevronsDown className="w-4 h-4" />
+                          : <ChevronsUp className="w-4 h-4" />
+                        : filteredProizvodi.some(p => expandedProizvodi[p.sif] === true)
+                          ? <ChevronsUp className="w-4 h-4" />
+                          : <ChevronsDown className="w-4 h-4" />
+                      }
                     </button>
-                    <button
-                      className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all border-l-2"
-                      style={{
-                        backgroundColor:
-                          viewMode === "po-proizvodu" ? PRIMARY : "transparent",
-                        color: viewMode === "po-proizvodu" ? "white" : PRIMARY,
-                        borderColor: PRIMARY,
-                      }}
-                      onClick={() => setViewMode("po-proizvodu")}
+
+                    <div
+                      className="flex rounded-lg overflow-hidden border-2"
+                      style={{ borderColor: PRIMARY }}
                     >
-                      Po proizvodu
-                    </button>
+                      <button
+                        className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all"
+                        style={{
+                          backgroundColor:
+                            viewMode === "po-kupcu" ? PRIMARY : "transparent",
+                          color: viewMode === "po-kupcu" ? "white" : PRIMARY,
+                        }}
+                        onClick={() => setViewMode("po-kupcu")}
+                      >
+                        Po kupcu
+                      </button>
+                      <button
+                        className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all border-l-2"
+                        style={{
+                          backgroundColor:
+                            viewMode === "po-proizvodu" ? PRIMARY : "transparent",
+                          color: viewMode === "po-proizvodu" ? "white" : PRIMARY,
+                          borderColor: PRIMARY,
+                        }}
+                        onClick={() => setViewMode("po-proizvodu")}
+                      >
+                        Po proizvodu
+                      </button>
+                    </div>
                   </div>
                   <button
                     onClick={() => { setSearchModalOpen(true); setTimeout(startSearchVoice, 300); }}

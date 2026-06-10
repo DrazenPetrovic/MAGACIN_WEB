@@ -220,8 +220,10 @@ export function ZavrseneNarudzbe({ onBack }: Props) {
 
           {/* ─── HEADER ─────────────────────────────────────────────────── */}
           <div className="border-b-2 border-gray-200 bg-white flex-none">
-            <div className="flex items-center justify-between gap-3 px-6 md:px-8 py-2 md:py-4">
-              <>
+            <div className="pl-2 pr-4 md:px-8 py-2 md:py-4">
+
+              {/* Red 1: nazad + odabir dana (+ pretraga i toggle na desktopu) */}
+              <div className="flex items-center gap-3">
                 <div className="flex items-center gap-3 flex-none">
                   <button
                     onClick={onBack}
@@ -281,8 +283,8 @@ export function ZavrseneNarudzbe({ onBack }: Props) {
                   </div>
                 </div>
 
-                {/* Pretraga */}
-                <div className="flex-1 flex justify-center px-2">
+                {/* Desktop: pretraga */}
+                <div className="hidden md:flex flex-1 justify-center px-2">
                   <div className="relative w-full max-w-xs">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: PRIMARY }} />
                     <input
@@ -305,6 +307,47 @@ export function ZavrseneNarudzbe({ onBack }: Props) {
                   </div>
                 </div>
 
+                {/* Desktop: toggle */}
+                <div className="hidden md:flex rounded-lg overflow-hidden border-2 flex-none" style={{ borderColor: PRIMARY }}>
+                  <button
+                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all"
+                    style={{ backgroundColor: viewMode === "po-kupcu" ? PRIMARY : "transparent", color: viewMode === "po-kupcu" ? "white" : PRIMARY }}
+                    onClick={() => setViewMode("po-kupcu")}
+                  >
+                    Po kupcu
+                  </button>
+                  <button
+                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all border-l-2"
+                    style={{ backgroundColor: viewMode === "po-proizvodu" ? PRIMARY : "transparent", color: viewMode === "po-proizvodu" ? "white" : PRIMARY, borderColor: PRIMARY }}
+                    onClick={() => setViewMode("po-proizvodu")}
+                  >
+                    Po proizvodu
+                  </button>
+                </div>
+              </div>
+
+              {/* Red 2: samo na mobilnom — pretraga + toggle */}
+              <div className="flex md:hidden items-center gap-3 mt-2">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: PRIMARY }} />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder={viewMode === "po-kupcu" ? "Pretraži po kupcu..." : "Pretraži po proizvodu..."}
+                    className="w-full pl-9 pr-8 py-1.5 text-sm border-2 rounded-lg focus:outline-none transition"
+                    style={{ borderColor: searchTerm.length >= 4 ? PRIMARY : "rgb(209 213 219)", color: "rgb(17 24 39)" }}
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded"
+                      style={{ color: "rgb(156 163 175)" }}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
                 <div className="flex rounded-lg overflow-hidden border-2 flex-none" style={{ borderColor: PRIMARY }}>
                   <button
                     className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all"
@@ -321,7 +364,8 @@ export function ZavrseneNarudzbe({ onBack }: Props) {
                     Po proizvodu
                   </button>
                 </div>
-              </>
+              </div>
+
             </div>
           </div>
 

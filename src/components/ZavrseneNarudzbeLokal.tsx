@@ -156,35 +156,92 @@ export function ZavrseneNarudzbeLokal({ onBack }: Props) {
 
           {/* ─── HEADER ───────────────────────────────────────────────────── */}
           <div className="border-b-2 border-gray-200 bg-white flex-none">
-            <div className="flex items-center justify-between gap-3 px-6 md:px-8 py-2 md:py-4">
+            <div className="pl-2 pr-4 md:px-8 py-2 md:py-4">
 
-              {/* Lijevo */}
-              <div className="flex items-center gap-3 flex-none">
-                <button
-                  onClick={onBack}
-                  className="flex items-center justify-center w-8 h-8 rounded-lg border-2 transition-all active:scale-95"
-                  style={{ color: PRIMARY, borderColor: PRIMARY }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = `${PRIMARY}10`)}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                </button>
-                <span className="text-base md:text-lg font-bold" style={{ color: PRIMARY }}>
-                  Završene Banja Luka
-                </span>
-                <button
-                  onClick={() => { void fetchData(); }}
-                  className="p-1.5 rounded-lg transition-all"
-                  style={{ color: PRIMARY }}
-                  title="Osvježi"
-                >
-                  <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-                </button>
+              {/* Red 1: nazad + naslov + refresh (+ pretraga i toggle na desktopu) */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-1">
+                  <button
+                    onClick={onBack}
+                    className="flex items-center justify-center w-8 h-8 rounded-lg border-2 transition-all active:scale-95"
+                    style={{ color: PRIMARY, borderColor: PRIMARY }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = `${PRIMARY}10`)}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-base md:text-lg font-bold" style={{ color: PRIMARY }}>
+                    Završene Banja Luka
+                  </span>
+                  <button
+                    onClick={() => { void fetchData(); }}
+                    className="p-1.5 rounded-lg transition-all"
+                    style={{ color: PRIMARY }}
+                    title="Osvježi"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+                  </button>
+                </div>
+
+                {/* Desktop: pretraga */}
+                <div className="hidden md:flex flex-1 justify-center px-2">
+                  <div className="relative w-full max-w-xs">
+                    <Search
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
+                      style={{ color: PRIMARY }}
+                    />
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder={viewMode === "po-partneru" ? "Pretraži po partneru..." : "Pretraži po proizvodu..."}
+                      className="w-full pl-9 pr-8 py-1.5 text-sm border-2 rounded-lg focus:outline-none transition"
+                      style={{
+                        borderColor: searchTerm.length >= 4 ? PRIMARY : "rgb(209 213 219)",
+                        color: "rgb(17 24 39)",
+                      }}
+                    />
+                    {searchTerm && (
+                      <button
+                        onClick={() => setSearchTerm("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded"
+                        style={{ color: "rgb(156 163 175)" }}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Desktop: toggle */}
+                <div className="hidden md:flex rounded-lg overflow-hidden border-2 flex-none" style={{ borderColor: PRIMARY }}>
+                  <button
+                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all"
+                    style={{
+                      backgroundColor: viewMode === "po-partneru" ? PRIMARY : "transparent",
+                      color: viewMode === "po-partneru" ? "white" : PRIMARY,
+                    }}
+                    onClick={() => setViewMode("po-partneru")}
+                  >
+                    Po partneru
+                  </button>
+                  <button
+                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all border-l-2"
+                    style={{
+                      backgroundColor: viewMode === "po-proizvodu" ? PRIMARY : "transparent",
+                      color: viewMode === "po-proizvodu" ? "white" : PRIMARY,
+                      borderColor: PRIMARY,
+                    }}
+                    onClick={() => setViewMode("po-proizvodu")}
+                  >
+                    Po proizvodu
+                  </button>
+                </div>
               </div>
 
-              {/* Centar — pretraga */}
-              <div className="flex-1 flex justify-center px-2">
-                <div className="relative w-full max-w-xs">
+              {/* Red 2: samo na mobilnom — pretraga + toggle */}
+              <div className="flex md:hidden items-center gap-3 mt-2">
+                <div className="flex-1 relative">
                   <Search
                     className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
                     style={{ color: PRIMARY }}
@@ -210,32 +267,31 @@ export function ZavrseneNarudzbeLokal({ onBack }: Props) {
                     </button>
                   )}
                 </div>
+                <div className="flex rounded-lg overflow-hidden border-2 flex-none" style={{ borderColor: PRIMARY }}>
+                  <button
+                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all"
+                    style={{
+                      backgroundColor: viewMode === "po-partneru" ? PRIMARY : "transparent",
+                      color: viewMode === "po-partneru" ? "white" : PRIMARY,
+                    }}
+                    onClick={() => setViewMode("po-partneru")}
+                  >
+                    Po partneru
+                  </button>
+                  <button
+                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all border-l-2"
+                    style={{
+                      backgroundColor: viewMode === "po-proizvodu" ? PRIMARY : "transparent",
+                      color: viewMode === "po-proizvodu" ? "white" : PRIMARY,
+                      borderColor: PRIMARY,
+                    }}
+                    onClick={() => setViewMode("po-proizvodu")}
+                  >
+                    Po proizvodu
+                  </button>
+                </div>
               </div>
 
-              {/* Desno — toggle */}
-              <div className="flex rounded-lg overflow-hidden border-2 flex-none" style={{ borderColor: PRIMARY }}>
-                <button
-                  className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all"
-                  style={{
-                    backgroundColor: viewMode === "po-partneru" ? PRIMARY : "transparent",
-                    color: viewMode === "po-partneru" ? "white" : PRIMARY,
-                  }}
-                  onClick={() => setViewMode("po-partneru")}
-                >
-                  Po partneru
-                </button>
-                <button
-                  className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all border-l-2"
-                  style={{
-                    backgroundColor: viewMode === "po-proizvodu" ? PRIMARY : "transparent",
-                    color: viewMode === "po-proizvodu" ? "white" : PRIMARY,
-                    borderColor: PRIMARY,
-                  }}
-                  onClick={() => setViewMode("po-proizvodu")}
-                >
-                  Po proizvodu
-                </button>
-              </div>
             </div>
           </div>
 
