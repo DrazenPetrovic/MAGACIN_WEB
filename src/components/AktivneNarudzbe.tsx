@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   ArrowLeft,
   Loader,
@@ -11,12 +11,15 @@ import {
   CheckCircle2,
   XCircle,
   Search,
+  Calculator,
 } from "lucide-react";
+import { KalkulatorModal } from "./KalkulatorModal";
 import { theme } from "../theme";
 import { apiFetch } from "../utils/apiFetch";
 
 const PRIMARY = theme.primary; // #785E9E
 const SECONDARY = theme.secondary; // #8FC74A
+const SWIPE_THRESHOLD = 100;
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3005";
 
@@ -152,7 +155,12 @@ export function AktivneNarudzbe({ onBack }: Props) {
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchListening, setSearchListening] = useState(false);
+  const [verifikovaniKupci, setVerifikovaniKupci] = useState<Set<string>>(new Set());
+  const [kalkulatorOpen, setKalkulatorOpen] = useState(false);
   const inputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map());
+  const cardRefs = useRef(new Map<string, HTMLDivElement>());
+  const overlayRefs = useRef(new Map<string, HTMLDivElement>());
+  const swipeDrag = useRef({ active: false, key: "", startX: 0, startY: 0, isHorizontal: null as boolean | null });
 
   const rowKey = (kupacKey: string, sif: string, idx: number) =>
     `${kupacKey}::${sif}::${idx}`;
@@ -179,6 +187,65 @@ export function AktivneNarudzbe({ onBack }: Props) {
   const isProizvodExpanded = (sif: string) => expandedProizvodi[sif] === true;
   const toggleKupac = (key: string) => setExpandedKupci(p => ({ ...p, [key]: !isKupacExpanded(key) }));
   const toggleProizvod = (sif: string) => setExpandedProizvodi(p => ({ ...p, [sif]: !isProizvodExpanded(sif) }));
+
+  const handleDragStart = useCallback((e: React.TouchEvent | React.MouseEvent, key: string) => {
+    if (e.type === "mousedown" && (e as React.MouseEvent).button !== 0) return;
+    const clientX = "touches" in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    swipeDrag.current = { active: true, key, startX: clientX, startY: clientY, isHorizontal: null };
+  }, []);
+
+  useEffect(() => {
+    const onMove = (e: TouchEvent | MouseEvent) => {
+      const drag = swipeDrag.current;
+      if (!drag.active) return;
+      const clientX = "touches" in e ? (e as TouchEvent).touches[0].clientX : (e as MouseEvent).clientX;
+      const clientY = "touches" in e ? (e as TouchEvent).touches[0].clientY : (e as MouseEvent).clientY;
+      const dx = clientX - drag.startX;
+      const dy = clientY - drag.startY;
+      if (drag.isHorizontal === null && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+        drag.isHorizontal = Math.abs(dx) > Math.abs(dy);
+      }
+      if (!drag.isHorizontal || dx <= 0) return;
+      (e as TouchEvent).preventDefault?.();
+      const limited = Math.min(dx, SWIPE_THRESHOLD * 1.5);
+      const card = cardRefs.current.get(drag.key);
+      const overlay = overlayRefs.current.get(drag.key);
+      if (card) card.style.transform = `translateX(${limited}px)`;
+      if (overlay) overlay.style.opacity = String(Math.min(limited / SWIPE_THRESHOLD, 1));
+    };
+
+    const onEnd = (e: TouchEvent | MouseEvent) => {
+      const drag = swipeDrag.current;
+      if (!drag.active) return;
+      drag.active = false;
+      const clientX = "changedTouches" in e
+        ? (e as TouchEvent).changedTouches[0].clientX
+        : (e as MouseEvent).clientX;
+      const dx = clientX - drag.startX;
+      const card = cardRefs.current.get(drag.key);
+      const overlay = overlayRefs.current.get(drag.key);
+      const verified = drag.isHorizontal === true && dx >= SWIPE_THRESHOLD;
+      if (verified) setVerifikovaniKupci(prev => new Set([...prev, drag.key]));
+      const snapCard = () => {
+        if (card) { card.style.transition = "transform 250ms cubic-bezier(0.25,0.46,0.45,0.94)"; card.style.transform = "translateX(0)"; }
+        if (overlay) { overlay.style.transition = "opacity 250ms ease"; overlay.style.opacity = "0"; }
+        setTimeout(() => { if (card) card.style.transition = ""; if (overlay) overlay.style.transition = ""; }, 260);
+      };
+      snapCard();
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onEnd);
+    window.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("touchend", onEnd);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onEnd);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onEnd);
+    };
+  }, []);
 
   const handleCollapseExpandAll = () => {
     if (viewMode === "po-kupcu") {
@@ -864,16 +931,34 @@ export function AktivneNarudzbe({ onBack }: Props) {
                             return saveStatus[k] === "ok";
                           });
                         return (
-                          <div
-                            key={kupacKey}
-                            className="bg-white rounded-xl shadow-lg overflow-hidden transition-all"
-                            style={{
-                              border: "2px solid rgb(229 231 235)",
-                              boxShadow: allFilled
-                                ? `0 0 0 3px ${SECONDARY}`
-                                : undefined,
-                            }}
-                          >
+                          <div key={kupacKey} className="relative rounded-xl overflow-hidden shadow-lg">
+                            {/* Swipe overlay */}
+                            <div
+                              ref={(el) => { if (el) overlayRefs.current.set(kupacKey, el); else overlayRefs.current.delete(kupacKey); }}
+                              className="absolute inset-0 flex items-center pl-6 pointer-events-none"
+                              style={{ background: SECONDARY, opacity: 0 }}
+                            >
+                              <CheckCircle2 className="w-8 h-8 flex-none" style={{ color: "white" }} />
+                              <span className="ml-3 font-bold text-base" style={{ color: "white" }}>Verificirano</span>
+                            </div>
+
+                            {/* Card */}
+                            <div
+                              ref={(el) => { if (el) cardRefs.current.set(kupacKey, el); else cardRefs.current.delete(kupacKey); }}
+                              className="bg-white rounded-xl overflow-hidden relative select-none"
+                              style={{
+                                border: verifikovaniKupci.has(kupacKey)
+                                  ? `2px solid ${PRIMARY}`
+                                  : allFilled
+                                    ? `2px solid ${SECONDARY}`
+                                    : "2px solid rgb(229 231 235)",
+                                boxShadow: allFilled && !verifikovaniKupci.has(kupacKey)
+                                  ? `0 0 0 3px ${SECONDARY}`
+                                  : undefined,
+                              }}
+                              onTouchStart={(e) => handleDragStart(e, kupacKey)}
+                              onMouseDown={(e) => handleDragStart(e, kupacKey)}
+                            >
                             {/* ─── Zaglavlje kupca ─── */}
                             <div
                               className="px-6 py-4 border-b-2 border-gray-200 cursor-pointer select-none"
@@ -1191,6 +1276,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                               </table>
                             </div>
                             )}
+                            </div>
                           </div>
                         );
                       })}
@@ -1684,6 +1770,18 @@ export function AktivneNarudzbe({ onBack }: Props) {
           </div>
         </div>
       )}
+
+      {/* ─── FAB: Kalkulator ────────────────────────────────────────────────── */}
+      <button
+        onClick={() => setKalkulatorOpen(true)}
+        className="fixed bottom-6 right-5 z-40 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform"
+        style={{ backgroundColor: PRIMARY }}
+        title="Otvori kalkulator"
+      >
+        <Calculator className="w-6 h-6 text-white" />
+      </button>
+
+      {kalkulatorOpen && <KalkulatorModal onClose={() => setKalkulatorOpen(false)} />}
 
       {/* ─── Modal: potvrda izmjene ──────────────────────────────────────────── */}
       {confirmKey !== null && (
