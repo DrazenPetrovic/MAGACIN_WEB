@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Loader, ChevronDown, Search, X } from "lucide-react";
+import { ArrowLeft, Loader, ChevronDown, Search, X, User, Package, RefreshCw } from "lucide-react";
 import { theme } from "../theme";
 import { apiFetch } from "../utils/apiFetch";
 
@@ -89,7 +89,8 @@ export function ZavrseneNarudzbe({ onBack }: Props) {
   const [dayDropdownOpen, setDayDropdownOpen]     = useState(false);
   const [searchTerm, setSearchTerm]               = useState("");
 
-  useEffect(() => {
+  const fetchData = () => {
+    setLoading(true);
     Promise.all([
       apiFetch(`${API_URL}/api/aktivne-narudzbe-teren/tereni-arhiva`),
       apiFetch(`${API_URL}/api/aktivne-narudzbe-teren/arhiva-grupisano`),
@@ -110,7 +111,9 @@ export function ZavrseneNarudzbe({ onBack }: Props) {
       })
       .catch((err) => console.error("Greška pri učitavanju arhive:", err))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { fetchData(); }, []);
 
   // ─── Grupisanje po kupcu za odabrani dan ──────────────────────────────────
   const narudzbePoKupcu: ArhivaKupac[] = (() => {
@@ -310,20 +313,30 @@ export function ZavrseneNarudzbe({ onBack }: Props) {
                 {/* Desktop: toggle */}
                 <div className="hidden md:flex rounded-lg overflow-hidden border-2 flex-none" style={{ borderColor: PRIMARY }}>
                   <button
-                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all"
+                    className="px-2.5 py-1.5 transition-all"
                     style={{ backgroundColor: viewMode === "po-kupcu" ? PRIMARY : "transparent", color: viewMode === "po-kupcu" ? "white" : PRIMARY }}
                     onClick={() => setViewMode("po-kupcu")}
+                    title="Po kupcu"
                   >
-                    Po kupcu
+                    <User className="w-4 h-4" />
                   </button>
                   <button
-                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all border-l-2"
+                    className="px-2.5 py-1.5 transition-all border-l-2"
                     style={{ backgroundColor: viewMode === "po-proizvodu" ? PRIMARY : "transparent", color: viewMode === "po-proizvodu" ? "white" : PRIMARY, borderColor: PRIMARY }}
                     onClick={() => setViewMode("po-proizvodu")}
+                    title="Po proizvodu"
                   >
-                    Po proizvodu
+                    <Package className="w-4 h-4" />
                   </button>
                 </div>
+                <button
+                  onClick={fetchData}
+                  className="hidden md:flex p-2 rounded-lg transition-all active:scale-95"
+                  style={{ color: PRIMARY, backgroundColor: `${PRIMARY}10` }}
+                  title="Ponovo učitaj narudžbe"
+                >
+                  <RefreshCw className="w-5 h-5" />
+                </button>
               </div>
 
               {/* Red 2: samo na mobilnom — pretraga + toggle */}
@@ -350,20 +363,30 @@ export function ZavrseneNarudzbe({ onBack }: Props) {
                 </div>
                 <div className="flex rounded-lg overflow-hidden border-2 flex-none" style={{ borderColor: PRIMARY }}>
                   <button
-                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all"
+                    className="px-2.5 py-1.5 transition-all"
                     style={{ backgroundColor: viewMode === "po-kupcu" ? PRIMARY : "transparent", color: viewMode === "po-kupcu" ? "white" : PRIMARY }}
                     onClick={() => setViewMode("po-kupcu")}
+                    title="Po kupcu"
                   >
-                    Po kupcu
+                    <User className="w-4 h-4" />
                   </button>
                   <button
-                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all border-l-2"
+                    className="px-2.5 py-1.5 transition-all border-l-2"
                     style={{ backgroundColor: viewMode === "po-proizvodu" ? PRIMARY : "transparent", color: viewMode === "po-proizvodu" ? "white" : PRIMARY, borderColor: PRIMARY }}
                     onClick={() => setViewMode("po-proizvodu")}
+                    title="Po proizvodu"
                   >
-                    Po proizvodu
+                    <Package className="w-4 h-4" />
                   </button>
                 </div>
+                <button
+                  onClick={fetchData}
+                  className="p-2 rounded-lg transition-all active:scale-95"
+                  style={{ color: PRIMARY, backgroundColor: `${PRIMARY}10` }}
+                  title="Ponovo učitaj narudžbe"
+                >
+                  <RefreshCw className="w-5 h-5" />
+                </button>
               </div>
 
             </div>

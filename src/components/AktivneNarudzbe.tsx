@@ -12,6 +12,8 @@ import {
   XCircle,
   Search,
   Calculator,
+  User,
+  Package,
 } from "lucide-react";
 import { KalkulatorModal } from "./KalkulatorModal";
 import { NumericKeyboard } from "./NumericKeyboard";
@@ -159,6 +161,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchListening, setSearchListening] = useState(false);
   const [verifikovaniKupci, setVerifikovaniKupci] = useState<Set<string>>(new Set());
+  const [verifikovaniProizvodi, setVerifikovaniProizvodi] = useState<Set<string>>(new Set());
   const [kalkulatorOpen, setKalkulatorOpen] = useState(false);
   const [numKbState, setNumKbState] = useState<{
     key: string;
@@ -234,13 +237,33 @@ export function AktivneNarudzbe({ onBack }: Props) {
       const card = cardRefs.current.get(drag.key);
       const overlay = overlayRefs.current.get(drag.key);
       const verified = drag.isHorizontal === true && dx >= SWIPE_THRESHOLD;
-      if (verified) setVerifikovaniKupci(prev => new Set([...prev, drag.key]));
-      const snapCard = () => {
+      if (verified) {
+        // 1) leti desno do kraja s punim overlayom
+        if (card) { card.style.transition = "transform 320ms ease-in"; card.style.transform = "translateX(110%)"; }
+        if (overlay) { overlay.style.transition = "opacity 150ms ease"; overlay.style.opacity = "1"; }
+        setTimeout(() => {
+          // 2) resetuj poziciju bez animacije (overlay još pokriven)
+          if (card) { card.style.transition = "none"; card.style.transform = "translateX(0)"; }
+          // 3) ažuriraj state (crveni border se pojavljuje)
+          if (drag.key.startsWith("prod_")) {
+            setVerifikovaniProizvodi(prev => new Set([...prev, drag.key.slice(5)]));
+          } else {
+            setVerifikovaniKupci(prev => new Set([...prev, drag.key]));
+          }
+          // 4) fade out overlaya
+          setTimeout(() => {
+            if (overlay) { overlay.style.transition = "opacity 250ms ease"; overlay.style.opacity = "0"; }
+            setTimeout(() => {
+              if (card) card.style.transition = "";
+              if (overlay) overlay.style.transition = "";
+            }, 260);
+          }, 50);
+        }, 330);
+      } else {
         if (card) { card.style.transition = "transform 250ms cubic-bezier(0.25,0.46,0.45,0.94)"; card.style.transform = "translateX(0)"; }
         if (overlay) { overlay.style.transition = "opacity 250ms ease"; overlay.style.opacity = "0"; }
         setTimeout(() => { if (card) card.style.transition = ""; if (overlay) overlay.style.transition = ""; }, 260);
-      };
-      snapCard();
+      }
     };
 
     window.addEventListener("mousemove", onMove);
@@ -809,18 +832,19 @@ export function AktivneNarudzbe({ onBack }: Props) {
                       style={{ borderColor: PRIMARY }}
                     >
                       <button
-                        className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all"
+                        className="px-2.5 py-1.5 transition-all"
                         style={{
                           backgroundColor:
                             viewMode === "po-kupcu" ? PRIMARY : "transparent",
                           color: viewMode === "po-kupcu" ? "white" : PRIMARY,
                         }}
                         onClick={() => setViewMode("po-kupcu")}
+                        title="Po kupcu"
                       >
-                        Po kupcu
+                        <User className="w-4 h-4" />
                       </button>
                       <button
-                        className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all border-l-2"
+                        className="px-2.5 py-1.5 transition-all border-l-2"
                         style={{
                           backgroundColor:
                             viewMode === "po-proizvodu" ? PRIMARY : "transparent",
@@ -828,8 +852,9 @@ export function AktivneNarudzbe({ onBack }: Props) {
                           borderColor: PRIMARY,
                         }}
                         onClick={() => setViewMode("po-proizvodu")}
+                        title="Po proizvodu"
                       >
-                        Po proizvodu
+                        <Package className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -850,20 +875,34 @@ export function AktivneNarudzbe({ onBack }: Props) {
                   </button>
                   {totalProizvoda > 0 && (
                     <div
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm"
-                      style={{
-                        background:
-                          spremljenoCount === totalProizvoda
-                            ? `${SECONDARY}22`
-                            : `${PRIMARY}10`,
-                        color:
-                          spremljenoCount === totalProizvoda
-                            ? SECONDARY
-                            : PRIMARY,
-                        border: `2px solid ${spremljenoCount === totalProizvoda ? SECONDARY : `${PRIMARY}30`}`,
-                      }}
+                      className="relative rounded-xl overflow-hidden"
+                      style={{ padding: '2px' }}
                     >
-                      Spremljeno: {spremljenoCount}/{totalProizvoda}
+                      {/* Spinning gradient border */}
+                      <div
+                        className="absolute pointer-events-none"
+                        style={{
+                          width: '300%',
+                          height: '300%',
+                          top: '50%',
+                          left: '50%',
+                          animation: 'spinBorder 2s linear infinite',
+                          background: spremljenoCount === totalProizvoda
+                            ? `conic-gradient(${SECONDARY}, #c5e87b, ${SECONDARY}88, #c5e87b, ${SECONDARY})`
+                            : `conic-gradient(${PRIMARY}, #b8a8d4, ${PRIMARY}88, #b8a8d4, ${PRIMARY})`,
+                        }}
+                      />
+                      <button
+                        onClick={() => { if (selectedDay !== null) fetchAktivneNarudzbeZaTeren(selectedDay); }}
+                        className="relative flex items-center gap-2 px-4 py-2 rounded-[10px] font-semibold text-sm active:scale-95 transition-transform"
+                        style={{
+                          background: spremljenoCount === totalProizvoda ? `${SECONDARY}22` : 'white',
+                          color: spremljenoCount === totalProizvoda ? SECONDARY : PRIMARY,
+                        }}
+                        title="Klikni za osvježavanje narudžbi"
+                      >
+                        Spremljeno: {spremljenoCount}/{totalProizvoda}
+                      </button>
                     </div>
                   )}
               </>
@@ -978,13 +1017,16 @@ export function AktivneNarudzbe({ onBack }: Props) {
                               className="bg-white rounded-xl overflow-hidden relative select-none"
                               style={{
                                 border: verifikovaniKupci.has(kupacKey)
-                                  ? `2px solid ${PRIMARY}`
+                                  ? "3px solid rgb(239 68 68)"
                                   : allFilled
                                     ? `2px solid ${SECONDARY}`
                                     : "2px solid rgb(229 231 235)",
-                                boxShadow: allFilled && !verifikovaniKupci.has(kupacKey)
-                                  ? `0 0 0 3px ${SECONDARY}`
-                                  : undefined,
+                                boxShadow: verifikovaniKupci.has(kupacKey)
+                                  ? "0 0 0 3px rgb(239 68 68)"
+                                  : allFilled
+                                    ? `0 0 0 3px ${SECONDARY}`
+                                    : undefined,
+                                touchAction: 'pan-y',
                               }}
                               onTouchStart={(e) => handleDragStart(e, kupacKey)}
                               onMouseDown={(e) => handleDragStart(e, kupacKey)}
@@ -1336,16 +1378,36 @@ export function AktivneNarudzbe({ onBack }: Props) {
                           return sum;
                         }, 0);
                         return (
-                          <div
-                            key={proizvod.sif}
-                            className="bg-white rounded-xl shadow-lg overflow-hidden transition-all"
-                            style={{
-                              border: "2px solid rgb(229 231 235)",
-                              boxShadow: allFilledP
-                                ? `0 0 0 3px ${SECONDARY}`
-                                : undefined,
-                            }}
-                          >
+                          <div key={proizvod.sif} className="relative rounded-xl overflow-hidden shadow-lg">
+                            {/* Swipe overlay */}
+                            <div
+                              ref={(el) => { if (el) overlayRefs.current.set(`prod_${proizvod.sif}`, el); else overlayRefs.current.delete(`prod_${proizvod.sif}`); }}
+                              className="absolute inset-0 flex items-center pl-6 pointer-events-none"
+                              style={{ background: SECONDARY, opacity: 0 }}
+                            >
+                              <CheckCircle2 className="w-8 h-8 flex-none" style={{ color: "white" }} />
+                              <span className="ml-3 font-bold text-base" style={{ color: "white" }}>Verificirano</span>
+                            </div>
+                            {/* Card */}
+                            <div
+                              ref={(el) => { if (el) cardRefs.current.set(`prod_${proizvod.sif}`, el); else cardRefs.current.delete(`prod_${proizvod.sif}`); }}
+                              className="bg-white rounded-xl overflow-hidden relative select-none transition-all"
+                              style={{
+                                border: verifikovaniProizvodi.has(proizvod.sif)
+                                  ? "3px solid rgb(239 68 68)"
+                                  : allFilledP
+                                    ? `2px solid ${SECONDARY}`
+                                    : "2px solid rgb(229 231 235)",
+                                boxShadow: verifikovaniProizvodi.has(proizvod.sif)
+                                  ? "0 0 0 3px rgb(239 68 68)"
+                                  : allFilledP
+                                    ? `0 0 0 3px ${SECONDARY}`
+                                    : undefined,
+                                touchAction: 'pan-y',
+                              }}
+                              onTouchStart={(e) => handleDragStart(e, `prod_${proizvod.sif}`)}
+                              onMouseDown={(e) => handleDragStart(e, `prod_${proizvod.sif}`)}
+                            >
                             {/* Zaglavlje proizvoda */}
                             <div
                               className="px-6 py-4 border-b-2 border-gray-200 cursor-pointer select-none"
@@ -1656,6 +1718,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                               </table>
                             </div>
                             )}
+                            </div>
                           </div>
                         );
                       })}

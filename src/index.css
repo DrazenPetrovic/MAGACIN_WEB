@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Spinning border za Spremljeno dugme ────────────────────────── */
+@keyframes spinBorder {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
 /* ─── Login animirani background (kao KANCELARIJA) ───────────────── */
 @keyframes softBgShift {
   0%   { background-position: 0% 50%; }
