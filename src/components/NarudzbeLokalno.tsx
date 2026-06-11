@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Play,
 } from "lucide-react";
+import { NumericKeyboard } from "./NumericKeyboard";
 import { theme } from "../theme";
 
 import { Capacitor } from "@capacitor/core";
@@ -385,6 +386,7 @@ export function NarudzbeLokalno({ onBack }: Props) {
     item: LokalniProizvod;
   } | null>(null);
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
+  const [numKbState, setNumKbState] = useState<{ key: string; label: string } | null>(null);
   const [prekoracenjeModal, setPrekoracenjeModal] = useState<{
     stavke: {
       naziv: string;
@@ -763,13 +765,24 @@ export function NarudzbeLokalno({ onBack }: Props) {
                     ? `${PRIMARY}10`
                     : "",
             }}
+            readOnly={isAndroid}
             onMouseDown={(e) => {
+              if (isAndroid) return;
               if (spremljeno[key] && spremljeno[key] !== "-1.000") {
                 e.preventDefault();
                 setConfirmKey(key);
               }
             }}
+            onClick={() => {
+              if (!isAndroid) return;
+              if (spremljeno[key] && spremljeno[key] !== "-1.000") {
+                setConfirmKey(key);
+              } else {
+                setNumKbState({ key, label: title });
+              }
+            }}
             onFocus={(e) => {
+              if (isAndroid) { e.target.blur(); return; }
               e.target.style.backgroundColor = "white";
               if (spremljeno[key] === "-1.000") {
                 setSpremljeno((p) => ({ ...p, [key]: "" }));
@@ -778,6 +791,7 @@ export function NarudzbeLokalno({ onBack }: Props) {
               }
             }}
             onBlur={(e) => {
+              if (isAndroid) return;
               e.target.style.backgroundColor = "";
               handleSpremljenoBlur(key);
             }}
@@ -1252,14 +1266,10 @@ export function NarudzbeLokalno({ onBack }: Props) {
                                                     : undefined
                                               }
                                               onClick={() => {
-                                                const hasVal =
-                                                  spremljeno[key] &&
-                                                  spremljeno[key] !== "-1.000";
+                                                const hasVal = spremljeno[key] && spremljeno[key] !== "-1.000";
                                                 if (hasVal) setConfirmKey(key);
-                                                else
-                                                  inputRefs.current
-                                                    .get(key)
-                                                    ?.focus();
+                                                else if (isAndroid) setNumKbState({ key, label: item.product_name });
+                                                else inputRefs.current.get(key)?.focus();
                                               }}
                                             >
                                               <td className="px-4 py-3 text-sm text-gray-900 align-top">
@@ -1395,6 +1405,7 @@ export function NarudzbeLokalno({ onBack }: Props) {
                                       onClick={() => {
                                         const hasVal = spremljeno[stavka.key] && spremljeno[stavka.key] !== "-1.000";
                                         if (hasVal) setConfirmKey(stavka.key);
+                                        else if (isAndroid) setNumKbState({ key: stavka.key, label: `${stavka.partner_name} — ${proizvod.product_name}` });
                                         else inputRefs.current.get(stavka.key)?.focus();
                                       }}
                                     >
@@ -1618,6 +1629,26 @@ export function NarudzbeLokalno({ onBack }: Props) {
         </div>
       )}
 
+      {/* ─── Numerička tastatura ─────────────────────────────────────────────── */}
+      {numKbState && (
+        <NumericKeyboard
+          value={spremljeno[numKbState.key] ?? ""}
+          label={numKbState.label}
+          onChange={(val) => {
+            if (val === "-1.000") {
+              setSpremljeno(p => ({ ...p, [numKbState.key]: "-1.000" }));
+            } else {
+              handleSpremljenoChange(numKbState.key, val);
+            }
+          }}
+          onConfirm={() => {
+            handleSpremljenoBlur(numKbState.key);
+            setNumKbState(null);
+          }}
+          onClose={() => setNumKbState(null)}
+        />
+      )}
+
       {/* ─── Modal: potvrda izmjene ──────────────────────────────────────────── */}
       {confirmKey !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -1633,9 +1664,19 @@ export function NarudzbeLokalno({ onBack }: Props) {
                 className="flex-1 py-3 rounded-xl font-bold text-white transition-all active:scale-95"
                 style={{ backgroundColor: SECONDARY }}
                 onClick={() => {
-                  const k = confirmKey;
+                  const k = confirmKey!;
                   setConfirmKey(null);
-                  setTimeout(() => inputRefs.current.get(k)?.focus(), 50);
+                  if (isAndroid) {
+                    let label = "";
+                    outer: for (const nar of narudzbe) {
+                      for (const item of nar.items) {
+                        if (rowKey(item.item_id) === k) { label = item.product_name; break outer; }
+                      }
+                    }
+                    setNumKbState({ key: k, label });
+                  } else {
+                    setTimeout(() => inputRefs.current.get(k)?.focus(), 50);
+                  }
                 }}
               >
                 Da

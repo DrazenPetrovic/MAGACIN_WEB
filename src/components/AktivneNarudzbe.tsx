@@ -14,12 +14,15 @@ import {
   Calculator,
 } from "lucide-react";
 import { KalkulatorModal } from "./KalkulatorModal";
+import { NumericKeyboard } from "./NumericKeyboard";
 import { theme } from "../theme";
 import { apiFetch } from "../utils/apiFetch";
+import { Capacitor } from "@capacitor/core";
 
 const PRIMARY = theme.primary; // #785E9E
 const SECONDARY = theme.secondary; // #8FC74A
 const SWIPE_THRESHOLD = 100;
+const isAndroid = Capacitor.getPlatform() === "android";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3005";
 
@@ -157,6 +160,11 @@ export function AktivneNarudzbe({ onBack }: Props) {
   const [searchListening, setSearchListening] = useState(false);
   const [verifikovaniKupci, setVerifikovaniKupci] = useState<Set<string>>(new Set());
   const [kalkulatorOpen, setKalkulatorOpen] = useState(false);
+  const [numKbState, setNumKbState] = useState<{
+    key: string;
+    sifraTabele?: number;
+    label: string;
+  } | null>(null);
   const inputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map());
   const cardRefs = useRef(new Map<string, HTMLDivElement>());
   const overlayRefs = useRef(new Map<string, HTMLDivElement>());
@@ -660,6 +668,28 @@ export function AktivneNarudzbe({ onBack }: Props) {
         p.naziv.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : proizvodiPoNazivu;
+
+  const openNumKbForKey = (key: string) => {
+    for (const kupac of narudzbePoKupcu) {
+      const kupacKey = getKupacGroupingKey(kupac.sifra_kupca, kupac.referentni_broj);
+      for (let idx = 0; idx < kupac.proizvodi.length; idx++) {
+        const p = kupac.proizvodi[idx];
+        if (rowKey(kupacKey, p.sif, idx) === key) {
+          setNumKbState({ key, sifraTabele: p.sifra_tabele, label: p.naziv_proizvoda });
+          return;
+        }
+      }
+    }
+    for (const p of filteredProizvodi) {
+      for (const stavka of p.stavke) {
+        if (stavka.key === key) {
+          setNumKbState({ key, sifraTabele: stavka.sifra_tabele, label: p.naziv });
+          return;
+        }
+      }
+    }
+    setNumKbState({ key, label: "" });
+  };
 
   // ===== RENDER =====
   return (
@@ -1176,17 +1206,27 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                           ? `${PRIMARY}10`
                                                           : "",
                                                   }}
+                                                  readOnly={isAndroid}
                                                   onMouseDown={(e) => {
+                                                    if (isAndroid) return;
                                                     if (
                                                       spremljeno[key] &&
-                                                      spremljeno[key] !==
-                                                        "-1.000"
+                                                      spremljeno[key] !== "-1.000"
                                                     ) {
                                                       e.preventDefault();
                                                       setConfirmKey(key);
                                                     }
                                                   }}
+                                                  onClick={() => {
+                                                    if (!isAndroid) return;
+                                                    if (spremljeno[key] && spremljeno[key] !== "-1.000") {
+                                                      setConfirmKey(key);
+                                                    } else {
+                                                      setNumKbState({ key, sifraTabele: proizvod.sifra_tabele, label: proizvod.naziv_proizvoda });
+                                                    }
+                                                  }}
                                                   onFocus={(e) => {
+                                                    if (isAndroid) { e.target.blur(); return; }
                                                     e.target.style.backgroundColor = "white";
                                                     if (spremljeno[key] === "-1.000") {
                                                       setSpremljeno((p) => ({ ...p, [key]: "" }));
@@ -1195,8 +1235,8 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                     }
                                                   }}
                                                   onBlur={(e) => {
-                                                    e.target.style.backgroundColor =
-                                                      "";
+                                                    if (isAndroid) return;
+                                                    e.target.style.backgroundColor = "";
                                                     handleSpremljenoBlur(
                                                       key,
                                                       proizvod.sifra_tabele,
@@ -1506,17 +1546,27 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                         ? `${PRIMARY}10`
                                                         : "",
                                                 }}
+                                                readOnly={isAndroid}
                                                 onMouseDown={(e) => {
+                                                  if (isAndroid) return;
                                                   if (
                                                     spremljeno[stavka.key] &&
-                                                    spremljeno[stavka.key] !==
-                                                      "-1.000"
+                                                    spremljeno[stavka.key] !== "-1.000"
                                                   ) {
                                                     e.preventDefault();
                                                     setConfirmKey(stavka.key);
                                                   }
                                                 }}
+                                                onClick={() => {
+                                                  if (!isAndroid) return;
+                                                  if (spremljeno[stavka.key] && spremljeno[stavka.key] !== "-1.000") {
+                                                    setConfirmKey(stavka.key);
+                                                  } else {
+                                                    setNumKbState({ key: stavka.key, sifraTabele: stavka.sifra_tabele, label: proizvod.naziv });
+                                                  }
+                                                }}
                                                 onFocus={(e) => {
+                                                  if (isAndroid) { e.target.blur(); return; }
                                                   e.target.style.backgroundColor = "white";
                                                   if (spremljeno[stavka.key] === "-1.000") {
                                                     setSpremljeno((p) => ({ ...p, [stavka.key]: "" }));
@@ -1525,8 +1575,8 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                   }
                                                 }}
                                                 onBlur={(e) => {
-                                                  e.target.style.backgroundColor =
-                                                    "";
+                                                  if (isAndroid) return;
+                                                  e.target.style.backgroundColor = "";
                                                   handleSpremljenoBlur(
                                                     stavka.key,
                                                     stavka.sifra_tabele,
@@ -1774,12 +1824,32 @@ export function AktivneNarudzbe({ onBack }: Props) {
       {/* ─── FAB: Kalkulator ────────────────────────────────────────────────── */}
       <button
         onClick={() => setKalkulatorOpen(true)}
-        className="fixed bottom-6 right-5 z-40 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform"
+        className="fixed bottom-20 right-5 z-40 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform"
         style={{ backgroundColor: PRIMARY }}
         title="Otvori kalkulator"
       >
         <Calculator className="w-6 h-6 text-white" />
       </button>
+
+      {numKbState && (
+        <NumericKeyboard
+          value={spremljeno[numKbState.key] ?? ""}
+          label={numKbState.label}
+          onChange={(val) => {
+            if (val === "-1.000") {
+              setSpremljeno(p => ({ ...p, [numKbState.key]: "-1.000" }));
+            } else {
+              handleSpremljenoChange(numKbState.key, val);
+            }
+          }}
+          onConfirm={() => {
+            const { key, sifraTabele } = numKbState;
+            setNumKbState(null);
+            handleSpremljenoBlur(key, sifraTabele, napomenaOp[key]);
+          }}
+          onClose={() => setNumKbState(null)}
+        />
+      )}
 
       {kalkulatorOpen && <KalkulatorModal onClose={() => setKalkulatorOpen(false)} />}
 
@@ -1798,9 +1868,13 @@ export function AktivneNarudzbe({ onBack }: Props) {
                 className="flex-1 py-3 rounded-xl font-bold text-white transition-all active:scale-95"
                 style={{ backgroundColor: SECONDARY }}
                 onClick={() => {
-                  const k = confirmKey;
+                  const k = confirmKey!;
                   setConfirmKey(null);
-                  setTimeout(() => inputRefs.current.get(k)?.focus(), 50);
+                  if (isAndroid) {
+                    openNumKbForKey(k);
+                  } else {
+                    setTimeout(() => inputRefs.current.get(k)?.focus(), 50);
+                  }
                 }}
               >
                 Da
