@@ -84,3 +84,40 @@ export const getArhiviraneNarudzbeGrupisano = async () => {
     return Array.isArray(rows) && rows.length > 0 ? rows[0] : [];
   });
 };
+
+// POST /api/aktivne-narudzbe-teren/verifikacija
+// Vrši verifikaciju grupe stavki (svi isti kupac ili svi isti proizvod).
+// Sve stavke moraju biti popunjene (provjera je na frontendu),
+// a sve se ažuriraju u jednoj transakciji — ili sve ili ništa.
+export const verifikujGrupu = async (sifraTabeleArray, verifikovano = 1) => {
+  return withConnection(async (connection) => {
+    await connection.beginTransaction();
+    try {
+      const results = [];
+      for (const sifraTabele of sifraTabeleArray) {
+        const [rows] = await connection.execute(
+          "CALL erp.sp_dostava_tereni_proizvodi_verifikacija(?, ?)",
+          [sifraTabele, verifikovano],
+        );
+        const result = Array.isArray(rows) && rows.length > 0 ? rows[0][0] : null;
+        if (!result || result.success !== 1) {
+          await connection.rollback();
+          return {
+            success: false,
+            poruka: `Greška za sifra_tabele ${sifraTabele}: ${result?.poruka ?? 'nepoznata greška'}`,
+          };
+        }
+        results.push(result);
+      }
+      await connection.commit();
+      return {
+        success: true,
+        poruka: verifikovano === 1 ? 'Verifikacija uspješna' : 'Verifikacija poništena',
+        results,
+      };
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    }
+  });
+};

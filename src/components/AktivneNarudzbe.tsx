@@ -35,6 +35,7 @@ interface NarudzbaProizvod {
   sifra_tabele?: number;
   naziv_proizvoda: string;
   jm: string;
+  verifikovano?: number;
   kolicina: number;
   napomena?: string;
   spremljena_kolicina?: number;
@@ -171,7 +172,15 @@ export function AktivneNarudzbe({ onBack }: Props) {
   const inputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map());
   const cardRefs = useRef(new Map<string, HTMLDivElement>());
   const overlayRefs = useRef(new Map<string, HTMLDivElement>());
-  const swipeDrag = useRef({ active: false, key: "", startX: 0, startY: 0, isHorizontal: null as boolean | null });
+  const swipeDrag = useRef({
+    active: false,
+    key: "",
+    startX: 0,
+    startY: 0,
+    isHorizontal: null as boolean | null,
+    canVerify: false,
+    sifraTabeleArray: [] as number[],
+  });
 
   const rowKey = (kupacKey: string, sif: string, idx: number) =>
     `${kupacKey}::${sif}::${idx}`;
@@ -199,11 +208,16 @@ export function AktivneNarudzbe({ onBack }: Props) {
   const toggleKupac = (key: string) => setExpandedKupci(p => ({ ...p, [key]: !isKupacExpanded(key) }));
   const toggleProizvod = (sif: string) => setExpandedProizvodi(p => ({ ...p, [sif]: !isProizvodExpanded(sif) }));
 
-  const handleDragStart = useCallback((e: React.TouchEvent | React.MouseEvent, key: string) => {
+  const handleDragStart = useCallback((
+    e: React.TouchEvent | React.MouseEvent,
+    key: string,
+    canVerify: boolean,
+    sifraTabeleArray: number[],
+  ) => {
     if (e.type === "mousedown" && (e as React.MouseEvent).button !== 0) return;
     const clientX = "touches" in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
     const clientY = "touches" in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
-    swipeDrag.current = { active: true, key, startX: clientX, startY: clientY, isHorizontal: null };
+    swipeDrag.current = { active: true, key, startX: clientX, startY: clientY, isHorizontal: null, canVerify, sifraTabeleArray };
   }, []);
 
   useEffect(() => {
@@ -236,7 +250,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
       const dx = clientX - drag.startX;
       const card = cardRefs.current.get(drag.key);
       const overlay = overlayRefs.current.get(drag.key);
-      const verified = drag.isHorizontal === true && dx >= SWIPE_THRESHOLD;
+      const verified = drag.isHorizontal === true && dx >= SWIPE_THRESHOLD && drag.canVerify;
       if (verified) {
         // 1) leti desno do kraja s punim overlayom
         if (card) { card.style.transition = "transform 320ms ease-in"; card.style.transform = "translateX(110%)"; }
@@ -250,7 +264,15 @@ export function AktivneNarudzbe({ onBack }: Props) {
           } else {
             setVerifikovaniKupci(prev => new Set([...prev, drag.key]));
           }
-          // 4) fade out overlaya
+          // 4) API poziv — snimanje u bazu
+          if (drag.sifraTabeleArray.length > 0) {
+            apiFetch(`${API_URL}/api/aktivne-narudzbe-teren/verifikacija`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ sifraTabeleArray: drag.sifraTabeleArray, verifikovano: 1 }),
+            }).catch((err) => console.error("Verifikacija API greška:", err));
+          }
+          // 5) fade out overlaya
           setTimeout(() => {
             if (overlay) { overlay.style.transition = "opacity 250ms ease"; overlay.style.opacity = "0"; }
             setTimeout(() => {
@@ -487,6 +509,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
             napomena: string;
             spremljena_kolicina?: number;
             referentni_broj?: string;
+            verifikovano?: number;
           }) => {
             const sifraKupca = item.sifra_patnera || item.sifra_partnera;
             const referentniBroj = normalizeReferentniBroj(
@@ -512,6 +535,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                 napomena: item.napomena || " ",
                 spremljena_kolicina: item.spremljena_kolicina,
                 sifra_kupca: sifraKupca,
+                verifikovano: item.verifikovano ?? 0,
               });
             }
           },
@@ -540,6 +564,35 @@ export function AktivneNarudzbe({ onBack }: Props) {
             }
           });
         });
+        // ─── Inicijalizacija verifikacije iz baze ─────────────────────────────
+        const initialVerifikovaniKupci = new Set<string>();
+        const prodVerMap = new Map<string, { total: number; verified: number }>();
+
+        finalList.forEach((kupac) => {
+          const kKey = getKupacGroupingKey(kupac.sifra_kupca, kupac.referentni_broj);
+          if (
+            kupac.proizvodi.length > 0 &&
+            kupac.proizvodi.every((p) => p.verifikovano === 1)
+          ) {
+            initialVerifikovaniKupci.add(kKey);
+          }
+          kupac.proizvodi.forEach((p) => {
+            const entry = prodVerMap.get(p.sif) ?? { total: 0, verified: 0 };
+            entry.total++;
+            if (p.verifikovano === 1) entry.verified++;
+            prodVerMap.set(p.sif, entry);
+          });
+        });
+
+        const initialVerifikovaniProizvodi = new Set<string>();
+        prodVerMap.forEach((entry, sif) => {
+          if (entry.total > 0 && entry.verified === entry.total) {
+            initialVerifikovaniProizvodi.add(sif);
+          }
+        });
+
+        setVerifikovaniKupci(initialVerifikovaniKupci);
+        setVerifikovaniProizvodi(initialVerifikovaniProizvodi);
         setSpremljeno(initialSpremljeno);
         setSaveStatus(initialSaveStatus);
         setNarudzbePoKupcu(finalList);
@@ -1028,8 +1081,14 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                     : undefined,
                                 touchAction: 'pan-y',
                               }}
-                              onTouchStart={(e) => handleDragStart(e, kupacKey)}
-                              onMouseDown={(e) => handleDragStart(e, kupacKey)}
+                              onTouchStart={(e) => handleDragStart(
+                                e, kupacKey, allFilled,
+                                kupac.proizvodi.map(p => p.sifra_tabele).filter((s): s is number => s != null),
+                              )}
+                              onMouseDown={(e) => handleDragStart(
+                                e, kupacKey, allFilled,
+                                kupac.proizvodi.map(p => p.sifra_tabele).filter((s): s is number => s != null),
+                              )}
                             >
                             {/* ─── Zaglavlje kupca ─── */}
                             <div
@@ -1405,8 +1464,14 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                     : undefined,
                                 touchAction: 'pan-y',
                               }}
-                              onTouchStart={(e) => handleDragStart(e, `prod_${proizvod.sif}`)}
-                              onMouseDown={(e) => handleDragStart(e, `prod_${proizvod.sif}`)}
+                              onTouchStart={(e) => handleDragStart(
+                                e, `prod_${proizvod.sif}`, allFilledP,
+                                proizvod.stavke.map(s => s.sifra_tabele).filter((s): s is number => s != null),
+                              )}
+                              onMouseDown={(e) => handleDragStart(
+                                e, `prod_${proizvod.sif}`, allFilledP,
+                                proizvod.stavke.map(s => s.sifra_tabele).filter((s): s is number => s != null),
+                              )}
                             >
                             {/* Zaglavlje proizvoda */}
                             <div

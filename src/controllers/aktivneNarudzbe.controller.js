@@ -78,6 +78,29 @@ export const getTerenPoDanima = async (req, res) => {
   }
 };
 
+// POST /api/aktivne-narudzbe-teren/verifikacija
+// Prima: { sifraTabeleArray: number[], verifikovano: 0|1 }
+// Validacija kompletnosti grupe je na frontendu — ovdje samo zapisujemo.
+export const verifikujGrupu = async (req, res) => {
+  try {
+    const { sifraTabeleArray, verifikovano } = req.body;
+    if (!Array.isArray(sifraTabeleArray) || sifraTabeleArray.length === 0) {
+      return res.status(400).json({ success: false, message: 'sifraTabeleArray je obavezan i ne smije biti prazan' });
+    }
+    const result = await AktivneNarudzbeService.verifikujGrupu(
+      sifraTabeleArray.map(Number),
+      verifikovano !== undefined ? Number(verifikovano) : 1,
+    );
+    if (result.success) {
+      return res.json(result);
+    }
+    return res.status(400).json({ success: false, message: result.poruka });
+  } catch (error) {
+    console.error('verifikujGrupu error:', error);
+    return res.status(500).json({ success: false, message: 'Greška pri verifikaciji' });
+  }
+};
+
 // GET /api/aktivne-narudzbe-teren/:sifraTerena
 // Vraća sve stavke aktivnih narudžbi za teren (detaljan prikaz)
 export const getAktivneNarudzbe = async (req, res) => {

@@ -6,6 +6,9 @@ const router = Router();
 // Ažuriraj količinu i napomenu za stavku
 router.post('/azuriraj', AktivneNarudzbeController.azurirajProizvod);
 
+// Verifikacija grupe stavki (svi isti kupac ili svi isti proizvod)
+router.post('/verifikacija', AktivneNarudzbeController.verifikujGrupu);
+
 // Dohvati sve terene po danima (frontend bira današnji)
 router.get('/tereni', AktivneNarudzbeController.getTerenPoDanima);
 
