@@ -14,6 +14,8 @@ import {
   Calculator,
   User,
   Package,
+  GripVertical,
+  Check,
 } from "lucide-react";
 import { KalkulatorModal } from "./KalkulatorModal";
 import { NumericKeyboard } from "./NumericKeyboard";
@@ -163,6 +165,13 @@ export function AktivneNarudzbe({ onBack }: Props) {
   const [searchListening, setSearchListening] = useState(false);
   const [verifikovaniKupci, setVerifikovaniKupci] = useState<Set<string>>(new Set());
   const [verifikovaniProizvodi, setVerifikovaniProizvodi] = useState<Set<string>>(new Set());
+  const [verifikacijaGreska, setVerifikacijaGreska] = useState<string | null>(null);
+  // ─── Reorder (samo Android) ───────────────────────────────────────────────
+  const [reorderMode, setReorderMode] = useState(false);
+  const [kupacCustomOrder, setKupacCustomOrder] = useState<string[] | null>(null);
+  const [draggingKey, setDraggingKey] = useState<string | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+  const [dragInsertBefore, setDragInsertBefore] = useState(true);
   const [kalkulatorOpen, setKalkulatorOpen] = useState(false);
   const [numKbState, setNumKbState] = useState<{
     key: string;
@@ -180,6 +189,24 @@ export function AktivneNarudzbe({ onBack }: Props) {
     isHorizontal: null as boolean | null,
     canVerify: false,
     sifraTabeleArray: [] as number[],
+  });
+  // Reorder refs — mirror state za pristup iz closures bez deps
+  const reorderModeRef = useRef(false);
+  const kupacCustomOrderRef = useRef<string[] | null>(null);
+  const dragOverKeyRef = useRef<string | null>(null);
+  const dragInsertBeforeRef = useRef(true);
+  const longPressRef = useRef<{
+    timer: ReturnType<typeof setTimeout> | null;
+    startX: number;
+    startY: number;
+    key: string;
+  }>({ timer: null, startX: 0, startY: 0, key: "" });
+  const reorderDrag = useRef({
+    active: false,
+    fromKey: "",
+    overKey: null as string | null,
+    insertBefore: true,
+    startY: 0,
   });
 
   const rowKey = (kupacKey: string, sif: string, idx: number) =>
@@ -208,12 +235,18 @@ export function AktivneNarudzbe({ onBack }: Props) {
   const toggleKupac = (key: string) => setExpandedKupci(p => ({ ...p, [key]: !isKupacExpanded(key) }));
   const toggleProizvod = (sif: string) => setExpandedProizvodi(p => ({ ...p, [sif]: !isProizvodExpanded(sif) }));
 
+  // Sync refs sa state-om (za pristup iz closures)
+  useEffect(() => { reorderModeRef.current = reorderMode; }, [reorderMode]);
+  useEffect(() => { kupacCustomOrderRef.current = kupacCustomOrder; }, [kupacCustomOrder]);
+  useEffect(() => { dragOverKeyRef.current = dragOverKey; }, [dragOverKey]);
+
   const handleDragStart = useCallback((
     e: React.TouchEvent | React.MouseEvent,
     key: string,
     canVerify: boolean,
     sifraTabeleArray: number[],
   ) => {
+    if (reorderModeRef.current) return; // swipe disabled u reorder modu
     if (e.type === "mousedown" && (e as React.MouseEvent).button !== 0) return;
     const clientX = "touches" in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
     const clientY = "touches" in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
@@ -250,7 +283,17 @@ export function AktivneNarudzbe({ onBack }: Props) {
       const dx = clientX - drag.startX;
       const card = cardRefs.current.get(drag.key);
       const overlay = overlayRefs.current.get(drag.key);
-      const verified = drag.isHorizontal === true && dx >= SWIPE_THRESHOLD && drag.canVerify;
+      const swipedFar = drag.isHorizontal === true && dx >= SWIPE_THRESHOLD;
+      const verified = swipedFar && drag.canVerify;
+      if (swipedFar && !drag.canVerify) {
+        // Swipe je prošao threshold ali stavke nisu sve popunjene
+        setVerifikacijaGreska("Popunite sve stavke prije verifikacije");
+        setTimeout(() => setVerifikacijaGreska(null), 3000);
+        if (card) { card.style.transition = "transform 250ms cubic-bezier(0.25,0.46,0.45,0.94)"; card.style.transform = "translateX(0)"; }
+        if (overlay) { overlay.style.transition = "opacity 250ms ease"; overlay.style.opacity = "0"; }
+        setTimeout(() => { if (card) card.style.transition = ""; if (overlay) overlay.style.transition = ""; }, 260);
+        return;
+      }
       if (verified) {
         // 1) leti desno do kraja s punim overlayom
         if (card) { card.style.transition = "transform 320ms ease-in"; card.style.transform = "translateX(110%)"; }
@@ -265,12 +308,41 @@ export function AktivneNarudzbe({ onBack }: Props) {
             setVerifikovaniKupci(prev => new Set([...prev, drag.key]));
           }
           // 4) API poziv — snimanje u bazu
+          const revertKey = drag.key;
+          const revertVerifikaciju = () => {
+            if (revertKey.startsWith("prod_")) {
+              setVerifikovaniProizvodi(prev => { const n = new Set(prev); n.delete(revertKey.slice(5)); return n; });
+            } else {
+              setVerifikovaniKupci(prev => { const n = new Set(prev); n.delete(revertKey); return n; });
+            }
+          };
+          const showGreska = (msg: string) => {
+            setVerifikacijaGreska(msg);
+            setTimeout(() => setVerifikacijaGreska(null), 4000);
+          };
           if (drag.sifraTabeleArray.length > 0) {
+            console.log("[Verifikacija] Šaljem sifraTabeleArray:", drag.sifraTabeleArray);
             apiFetch(`${API_URL}/api/aktivne-narudzbe-teren/verifikacija`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ sifraTabeleArray: drag.sifraTabeleArray, verifikovano: 1 }),
-            }).catch((err) => console.error("Verifikacija API greška:", err));
+            })
+              .then((r) => r.json())
+              .then((data) => {
+                console.log("[Verifikacija] Odgovor:", data);
+                if (!data.success) {
+                  revertVerifikaciju();
+                  showGreska(data.message || data.poruka || "Greška pri verifikaciji");
+                }
+              })
+              .catch((err) => {
+                console.error("[Verifikacija] Greška:", err);
+                revertVerifikaciju();
+                showGreska("Greška pri spajanju na server");
+              });
+          } else {
+            console.warn("[Verifikacija] sifraTabeleArray je prazan — provjeri da li sifra_tabele dolazi iz API-ja");
+            revertVerifikaciju();
+            showGreska("Verifikacija nije moguća: nema sifra_tabele u podacima");
           }
           // 5) fade out overlaya
           setTimeout(() => {
@@ -299,6 +371,106 @@ export function AktivneNarudzbe({ onBack }: Props) {
       window.removeEventListener("touchend", onEnd);
     };
   }, []);
+
+  // ─── Reorder drag (samo Android, aktivan dok je reorderMode) ─────────────
+  useEffect(() => {
+    const onMove = (e: TouchEvent) => {
+      if (!reorderDrag.current.fromKey) return;
+      const touch = e.touches[0];
+      const dy = Math.abs(touch.clientY - reorderDrag.current.startY);
+      if (!reorderDrag.current.active && dy > 12) {
+        reorderDrag.current.active = true;
+        setDraggingKey(reorderDrag.current.fromKey);
+      }
+      if (!reorderDrag.current.active) return;
+      e.preventDefault();
+      // Nađi koji element je ispod prsta
+      const el = document.elementFromPoint(touch.clientX, touch.clientY);
+      let target: Element | null = el;
+      let overKey: string | null = null;
+      let insertBefore = true;
+      while (target) {
+        const key = (target as HTMLElement).dataset?.kupacKey;
+        if (key && key !== reorderDrag.current.fromKey) {
+          const rect = target.getBoundingClientRect();
+          insertBefore = touch.clientY < rect.top + rect.height / 2;
+          overKey = key;
+          break;
+        }
+        target = target.parentElement;
+      }
+      reorderDrag.current.overKey = overKey;
+      reorderDrag.current.insertBefore = insertBefore;
+      if (overKey !== dragOverKeyRef.current || insertBefore !== dragInsertBeforeRef.current) {
+        dragOverKeyRef.current = overKey;
+        dragInsertBeforeRef.current = insertBefore;
+        setDragOverKey(overKey);
+        setDragInsertBefore(insertBefore);
+      }
+    };
+
+    const onEnd = () => {
+      if (!reorderDrag.current.fromKey) return;
+      const { fromKey, overKey, insertBefore, active } = reorderDrag.current;
+      reorderDrag.current = { active: false, fromKey: "", overKey: null, insertBefore: true, startY: 0 };
+      setDraggingKey(null);
+      setDragOverKey(null);
+      setDragInsertBefore(true);
+      if (active && overKey && overKey !== fromKey) {
+        setKupacCustomOrder(prev => {
+          if (!prev) return prev;
+          const from = prev.indexOf(fromKey);
+          const next = [...prev];
+          next.splice(from, 1);
+          const to = next.indexOf(overKey);
+          if (to === -1) return prev;
+          next.splice(insertBefore ? to : to + 1, 0, fromKey);
+          return next;
+        });
+      }
+    };
+
+    window.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("touchend", onEnd);
+    return () => {
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onEnd);
+    };
+  }, []);
+
+  // ─── Sačuvaj/učitaj custom redosljed u localStorage ───────────────────────
+  useEffect(() => {
+    if (kupacCustomOrder && selectedDay !== null) {
+      localStorage.setItem(`kupacOrder_${selectedDay}`, JSON.stringify(kupacCustomOrder));
+    }
+  }, [kupacCustomOrder, selectedDay]);
+
+  // ─── Long press pomoćnici ─────────────────────────────────────────────────
+  const startLongPress = (kupacKey: string, clientX: number, clientY: number, initialOrderKeys: string[]) => {
+    longPressRef.current.timer = setTimeout(() => {
+      if (!reorderModeRef.current) {
+        setReorderMode(true);
+        reorderModeRef.current = true;
+        if (!kupacCustomOrderRef.current) {
+          setKupacCustomOrder(initialOrderKeys);
+          kupacCustomOrderRef.current = initialOrderKeys;
+        }
+      }
+      reorderDrag.current = { active: false, fromKey: kupacKey, overKey: null, insertBefore: true, startY: clientY };
+      swipeDrag.current.active = false; // otkaži swipe ako je počeo
+      if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
+    }, 3000);
+    longPressRef.current.startX = clientX;
+    longPressRef.current.startY = clientY;
+    longPressRef.current.key = kupacKey;
+  };
+
+  const cancelLongPress = () => {
+    if (longPressRef.current.timer) {
+      clearTimeout(longPressRef.current.timer);
+      longPressRef.current.timer = null;
+    }
+  };
 
   const handleCollapseExpandAll = () => {
     if (viewMode === "po-kupcu") {
@@ -596,6 +768,19 @@ export function AktivneNarudzbe({ onBack }: Props) {
         setSpremljeno(initialSpremljeno);
         setSaveStatus(initialSaveStatus);
         setNarudzbePoKupcu(finalList);
+
+        // Učitaj sačuvani redosljed kupaca iz localStorage
+        try {
+          const saved = localStorage.getItem(`kupacOrder_${sifraTerenaDostava}`);
+          if (saved) {
+            const parsed: string[] = JSON.parse(saved);
+            setKupacCustomOrder(parsed);
+            kupacCustomOrderRef.current = parsed;
+          } else {
+            setKupacCustomOrder(null);
+            kupacCustomOrderRef.current = null;
+          }
+        } catch { /* ignoriši */ }
       }
     } catch (error) {
       console.error("Greška pri učitavanju narudžbi:", error);
@@ -666,6 +851,24 @@ export function AktivneNarudzbe({ onBack }: Props) {
       )?.sinhronizovano ?? 9999;
     return rA - rB;
   });
+
+  // Primijeni custom redosljed ako postoji (drag-to-reorder)
+  const displayedKupci: NarudzbaKupac[] = (() => {
+    if (!kupacCustomOrder) return sortedNarudzbePoKupcu;
+    const ordered: NarudzbaKupac[] = [];
+    for (const key of kupacCustomOrder) {
+      const k = narudzbePoKupcu.find(
+        k2 => getKupacGroupingKey(k2.sifra_kupca, k2.referentni_broj) === key,
+      );
+      if (k) ordered.push(k);
+    }
+    // Dodaj kupce koji nisu u sačuvanom order-u (novi)
+    for (const k of sortedNarudzbePoKupcu) {
+      const key = getKupacGroupingKey(k.sifra_kupca, k.referentni_broj);
+      if (!kupacCustomOrder.includes(key)) ordered.push(k);
+    }
+    return ordered;
+  })();
 
   // ─── Brojač spremljenih ────────────────────────────────────────────────────
   const totalProizvoda = narudzbePoKupcu.reduce(
@@ -773,192 +976,226 @@ export function AktivneNarudzbe({ onBack }: Props) {
       className="flex flex-col"
       style={{ height: "100dvh", background: "#f1f5f9" }}
     >
+      {verifikacijaGreska && (
+        <div
+          className="fixed top-4 left-1/2 z-50 rounded-xl px-5 py-3 shadow-2xl text-white text-sm font-semibold"
+          style={{ transform: "translateX(-50%)", background: "#dc2626", minWidth: "260px", textAlign: "center" }}
+        >
+          {verifikacijaGreska}
+        </div>
+      )}
+      {/* Reorder mode banner — fiksiran pri dnu, samo Android */}
+      {isAndroid && reorderMode && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-3 shadow-2xl"
+          style={{ background: PRIMARY }}
+        >
+          <div className="flex items-center gap-3 text-white">
+            <GripVertical className="w-5 h-5" />
+            <span className="text-sm font-semibold">Držite zaglavlje i prevucite za promjenu redosljeda</span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="px-4 py-2 rounded-xl text-sm font-bold text-white border border-white/40 active:opacity-70"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                setKupacCustomOrder(null);
+                kupacCustomOrderRef.current = null;
+                if (selectedDay !== null) localStorage.removeItem(`kupacOrder_${selectedDay}`);
+              }}
+            >
+              Resetuj
+            </button>
+            <button
+              className="px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 active:opacity-70"
+              style={{ background: SECONDARY, color: "white" }}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                setReorderMode(false);
+                reorderModeRef.current = false;
+              }}
+            >
+              <Check className="w-4 h-4" />
+              Gotovo
+            </button>
+          </div>
+        </div>
+      )}
       {/* ─── Outer card wrapper (identično KOMERCIJALA) ─────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden m-0 md:m-3">
         <div className="bg-white rounded-none md:rounded-2xl shadow-xl overflow-hidden flex flex-col h-full">
           {/* ─── HEADER — KOLAPSIBILAN (identično KOMERCIJALA) ──────────────── */}
           <div className="border-b-2 border-gray-200 bg-white flex-none">
-            <div className="flex items-center justify-between gap-3 pl-2 pr-4 md:px-8 py-2 md:py-4">
-              <>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={onBack}
-                      className="flex items-center justify-center w-8 h-8 rounded-lg border-2 transition-all active:scale-95"
-                      style={{ color: PRIMARY, borderColor: PRIMARY }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.backgroundColor = `${PRIMARY}10`)
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.backgroundColor = "transparent")
-                      }
-                    >
-                      <ArrowLeft className="w-4 h-4" />
-                    </button>
-                    <div className="relative">
-                      <button
-                        onClick={() => setDayDropdownOpen((o) => !o)}
-                        className="flex items-center gap-2 rounded-lg px-2 py-1 transition-all hover:bg-gray-100 active:bg-gray-200"
-                      >
-                        <span className="text-base md:text-lg font-bold" style={{ color: PRIMARY }}>
-                          {nazivDana || "Aktivne narudžbe"}
-                        </span>
-                        {datumDostave && (
-                          <span className="text-sm font-normal text-gray-500">{datumDostave}</span>
-                        )}
-                        <ChevronDown
-                          className="w-4 h-4 transition-transform"
-                          style={{ color: PRIMARY, transform: dayDropdownOpen ? "rotate(180deg)" : "rotate(0deg)" }}
-                        />
-                      </button>
-
-                      {dayDropdownOpen && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-20"
-                            onClick={() => setDayDropdownOpen(false)}
-                          />
-                          <div className="absolute left-0 top-full mt-1 z-30 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden min-w-52">
-                            {uniqueDays.filter((d) => {
-                              const dStr = d.rawDate ? toLocalDateStr(d.rawDate) : '';
-                              return dStr > todayStr;
-                            }).map((d) => {
-                              const dStr = d.rawDate ? toLocalDateStr(d.rawDate) : '';
-                              const isAfterToday = dStr > todayStr;
-                              const isSelected = selectedDay === d.sifraTerenaDostava;
-                              return (
-                                <button
-                                  key={d.sifraTerenaDostava}
-                                  onClick={() => { handleDayClick(d); setDayDropdownOpen(false); }}
-                                  className="w-full text-left px-4 py-3 flex items-center justify-between gap-4 transition-colors hover:bg-gray-50 active:bg-gray-100"
-                                  style={{
-                                    backgroundColor: isSelected ? `${PRIMARY}12` : undefined,
-                                    borderLeft: isSelected ? `3px solid ${PRIMARY}` : "3px solid transparent",
-                                  }}
-                                >
-                                  <span
-                                    className="font-semibold text-sm"
-                                    style={{ color: isAfterToday ? "rgb(156 163 175)" : isSelected ? PRIMARY : "rgb(55 65 81)" }}
-                                  >
-                                    {d.day}
-                                  </span>
-                                  <span
-                                    className="text-xs"
-                                    style={{ color: isAfterToday ? "rgb(209 213 219)" : "rgb(107 114 128)" }}
-                                  >
-                                    {d.date}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={handleCollapseExpandAll}
-                      className="flex items-center justify-center w-8 h-8 rounded-lg border-2 transition-all active:scale-95"
-                      style={{ color: PRIMARY, borderColor: PRIMARY }}
-                      title={
-                        viewMode === "po-kupcu"
-                          ? narudzbePoKupcu.every(k => expandedKupci[getKupacGroupingKey(k.sifra_kupca, k.referentni_broj)] === false)
-                            ? "Proširi sve"
-                            : "Kolabira sve"
-                          : filteredProizvodi.some(p => expandedProizvodi[p.sif] === true)
-                            ? "Kolabira sve"
-                            : "Proširi sve"
-                      }
-                    >
-                      {viewMode === "po-kupcu"
-                        ? narudzbePoKupcu.every(k => expandedKupci[getKupacGroupingKey(k.sifra_kupca, k.referentni_broj)] === false)
-                          ? <ChevronsDown className="w-4 h-4" />
-                          : <ChevronsUp className="w-4 h-4" />
-                        : filteredProizvodi.some(p => expandedProizvodi[p.sif] === true)
-                          ? <ChevronsUp className="w-4 h-4" />
-                          : <ChevronsDown className="w-4 h-4" />
-                      }
-                    </button>
-
-                    <div
-                      className="flex rounded-lg overflow-hidden border-2"
-                      style={{ borderColor: PRIMARY }}
-                    >
-                      <button
-                        className="px-2.5 py-1.5 transition-all"
-                        style={{
-                          backgroundColor:
-                            viewMode === "po-kupcu" ? PRIMARY : "transparent",
-                          color: viewMode === "po-kupcu" ? "white" : PRIMARY,
-                        }}
-                        onClick={() => setViewMode("po-kupcu")}
-                        title="Po kupcu"
-                      >
-                        <User className="w-4 h-4" />
-                      </button>
-                      <button
-                        className="px-2.5 py-1.5 transition-all border-l-2"
-                        style={{
-                          backgroundColor:
-                            viewMode === "po-proizvodu" ? PRIMARY : "transparent",
-                          color: viewMode === "po-proizvodu" ? "white" : PRIMARY,
-                          borderColor: PRIMARY,
-                        }}
-                        onClick={() => setViewMode("po-proizvodu")}
-                        title="Po proizvodu"
-                      >
-                        <Package className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
+            <div className="grid grid-cols-3 items-center pl-2 pr-4 md:px-8 py-2 md:py-4">
+              {/* ── LIJEVO: nazad + dan ── */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={onBack}
+                  className="flex items-center justify-center w-8 h-8 rounded-lg border-2 transition-all active:scale-95 flex-none"
+                  style={{ color: PRIMARY, borderColor: PRIMARY }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = `${PRIMARY}10`)}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <div className="relative">
                   <button
-                    onClick={() => { setSearchModalOpen(true); setTimeout(startSearchVoice, 300); }}
-                    className="p-2 rounded-lg transition-all relative"
-                    style={{
-                      backgroundColor: searchQuery ? `${PRIMARY}22` : `${PRIMARY}10`,
-                      color: PRIMARY,
-                      visibility: viewMode === "po-proizvodu" ? "visible" : "hidden",
-                    }}
-                    title="Pretraga glasom"
+                    onClick={() => setDayDropdownOpen((o) => !o)}
+                    className="flex items-center gap-2 rounded-lg px-2 py-1 transition-all hover:bg-gray-100 active:bg-gray-200"
                   >
-                    <Search className="w-5 h-5" />
-                    {searchQuery && (
-                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SECONDARY }} />
+                    <span className="text-base md:text-lg font-bold" style={{ color: PRIMARY }}>
+                      {nazivDana || "Aktivne narudžbe"}
+                    </span>
+                    {datumDostave && (
+                      <span className="text-sm font-normal text-gray-500">{datumDostave}</span>
                     )}
+                    <ChevronDown
+                      className="w-4 h-4 transition-transform"
+                      style={{ color: PRIMARY, transform: dayDropdownOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+                    />
                   </button>
-                  {totalProizvoda > 0 && (
-                    <div
-                      className="relative rounded-xl overflow-hidden"
-                      style={{ padding: '2px' }}
-                    >
-                      {/* Spinning gradient border */}
-                      <div
-                        className="absolute pointer-events-none"
-                        style={{
-                          width: '300%',
-                          height: '300%',
-                          top: '50%',
-                          left: '50%',
-                          animation: 'spinBorder 2s linear infinite',
-                          background: spremljenoCount === totalProizvoda
-                            ? `conic-gradient(${SECONDARY}, #c5e87b, ${SECONDARY}88, #c5e87b, ${SECONDARY})`
-                            : `conic-gradient(${PRIMARY}, #b8a8d4, ${PRIMARY}88, #b8a8d4, ${PRIMARY})`,
-                        }}
-                      />
-                      <button
-                        onClick={() => { if (selectedDay !== null) fetchAktivneNarudzbeZaTeren(selectedDay); }}
-                        className="relative flex items-center gap-2 px-4 py-2 rounded-[10px] font-semibold text-sm active:scale-95 transition-transform"
-                        style={{
-                          background: spremljenoCount === totalProizvoda ? `${SECONDARY}22` : 'white',
-                          color: spremljenoCount === totalProizvoda ? SECONDARY : PRIMARY,
-                        }}
-                        title="Klikni za osvježavanje narudžbi"
-                      >
-                        Spremljeno: {spremljenoCount}/{totalProizvoda}
-                      </button>
-                    </div>
+                  {dayDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-20" onClick={() => setDayDropdownOpen(false)} />
+                      <div className="absolute left-0 top-full mt-1 z-30 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden min-w-52">
+                        {uniqueDays.filter((d) => {
+                          const dStr = d.rawDate ? toLocalDateStr(d.rawDate) : '';
+                          return dStr > todayStr;
+                        }).map((d) => {
+                          const dStr = d.rawDate ? toLocalDateStr(d.rawDate) : '';
+                          const isAfterToday = dStr > todayStr;
+                          const isSelected = selectedDay === d.sifraTerenaDostava;
+                          return (
+                            <button
+                              key={d.sifraTerenaDostava}
+                              onClick={() => { handleDayClick(d); setDayDropdownOpen(false); }}
+                              className="w-full text-left px-4 py-3 flex items-center justify-between gap-4 transition-colors hover:bg-gray-50 active:bg-gray-100"
+                              style={{
+                                backgroundColor: isSelected ? `${PRIMARY}12` : undefined,
+                                borderLeft: isSelected ? `3px solid ${PRIMARY}` : "3px solid transparent",
+                              }}
+                            >
+                              <span className="font-semibold text-sm" style={{ color: isAfterToday ? "rgb(156 163 175)" : isSelected ? PRIMARY : "rgb(55 65 81)" }}>
+                                {d.day}
+                              </span>
+                              <span className="text-xs" style={{ color: isAfterToday ? "rgb(209 213 219)" : "rgb(107 114 128)" }}>
+                                {d.date}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
                   )}
-              </>
+                </div>
+              </div>
+
+              {/* ── CENTAR: collapse + toggle po kupcu / po proizvodu ── */}
+              <div className="flex items-center justify-center gap-2">
+                <button
+                  onClick={handleCollapseExpandAll}
+                  className="flex items-center justify-center w-9 h-9 rounded-lg border-2 transition-all active:scale-95"
+                  style={{ color: PRIMARY, borderColor: PRIMARY }}
+                  title={
+                    viewMode === "po-kupcu"
+                      ? narudzbePoKupcu.every(k => expandedKupci[getKupacGroupingKey(k.sifra_kupca, k.referentni_broj)] === false) ? "Proširi sve" : "Kolabira sve"
+                      : filteredProizvodi.some(p => expandedProizvodi[p.sif] === true) ? "Kolabira sve" : "Proširi sve"
+                  }
+                >
+                  {viewMode === "po-kupcu"
+                    ? narudzbePoKupcu.every(k => expandedKupci[getKupacGroupingKey(k.sifra_kupca, k.referentni_broj)] === false)
+                      ? <ChevronsDown className="w-5 h-5" />
+                      : <ChevronsUp className="w-5 h-5" />
+                    : filteredProizvodi.some(p => expandedProizvodi[p.sif] === true)
+                      ? <ChevronsUp className="w-5 h-5" />
+                      : <ChevronsDown className="w-5 h-5" />
+                  }
+                </button>
+                <div
+                  className="flex rounded-lg overflow-hidden border-2"
+                  style={{ borderColor: PRIMARY }}
+                >
+                  <button
+                    className="px-3 py-2 transition-all"
+                    style={{
+                      backgroundColor: viewMode === "po-kupcu" ? PRIMARY : "transparent",
+                      color: viewMode === "po-kupcu" ? "white" : PRIMARY,
+                    }}
+                    onClick={() => {
+                      setViewMode("po-kupcu");
+                    }}
+                    title="Po kupcu"
+                  >
+                    <User className="w-6 h-6" />
+                  </button>
+                  <button
+                    className="px-3 py-2 transition-all border-l-2"
+                    style={{
+                      backgroundColor: viewMode === "po-proizvodu" ? PRIMARY : "transparent",
+                      color: viewMode === "po-proizvodu" ? "white" : PRIMARY,
+                      borderColor: PRIMARY,
+                    }}
+                    onClick={() => {
+                      setViewMode("po-proizvodu");
+                      // Reorder mode je samo za po-kupcu — reset pri prelasku
+                      if (reorderModeRef.current) {
+                        setReorderMode(false);
+                        reorderModeRef.current = false;
+                      }
+                    }}
+                    title="Po proizvodu"
+                  >
+                    <Package className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+
+              {/* ── DESNO: search + Spremljeno ── */}
+              <div className="flex items-center justify-end gap-1.5">
+                <button
+                  onClick={() => { setSearchModalOpen(true); setTimeout(startSearchVoice, 300); }}
+                  className="p-2 rounded-lg transition-all relative"
+                  style={{
+                    backgroundColor: searchQuery ? `${PRIMARY}22` : `${PRIMARY}10`,
+                    color: PRIMARY,
+                    visibility: viewMode === "po-proizvodu" ? "visible" : "hidden",
+                  }}
+                  title="Pretraga glasom"
+                >
+                  <Search className="w-5 h-5" />
+                  {searchQuery && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SECONDARY }} />
+                  )}
+                </button>
+                {totalProizvoda > 0 && (
+                  <div className="relative rounded-xl overflow-hidden" style={{ padding: '2px' }}>
+                    <div
+                      className="absolute pointer-events-none"
+                      style={{
+                        width: '300%',
+                        height: '300%',
+                        top: '50%',
+                        left: '50%',
+                        animation: 'spinBorder 2s linear infinite',
+                        background: spremljenoCount === totalProizvoda
+                          ? `conic-gradient(${SECONDARY}, #c5e87b, ${SECONDARY}88, #c5e87b, ${SECONDARY})`
+                          : `conic-gradient(${PRIMARY}, #b8a8d4, ${PRIMARY}88, #b8a8d4, ${PRIMARY})`,
+                      }}
+                    />
+                    <button
+                      onClick={() => { if (selectedDay !== null) fetchAktivneNarudzbeZaTeren(selectedDay); }}
+                      className="relative flex items-center gap-2 px-4 py-2 rounded-[10px] font-semibold text-sm active:scale-95 transition-transform"
+                      style={{
+                        background: spremljenoCount === totalProizvoda ? `${SECONDARY}22` : 'white',
+                        color: spremljenoCount === totalProizvoda ? SECONDARY : PRIMARY,
+                      }}
+                      title="Klikni za osvježavanje narudžbi"
+                    >
+                      Spremljeno: {spremljenoCount}/{totalProizvoda}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1044,7 +1281,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                     </div>
                   ) : viewMode === "po-kupcu" ? (
                     <div className="space-y-6">
-                      {sortedNarudzbePoKupcu.map((kupac) => {
+                      {displayedKupci.map((kupac) => {
                         const kupacKey = getKupacGroupingKey(kupac.sifra_kupca, kupac.referentni_broj);
                         const allFilled =
                           kupac.proizvodi.length > 0 &&
@@ -1052,8 +1289,37 @@ export function AktivneNarudzbe({ onBack }: Props) {
                             const k = rowKey(kupacKey, p.sif, idx);
                             return saveStatus[k] === "ok";
                           });
-                        return (
-                          <div key={kupacKey} className="relative rounded-xl overflow-hidden shadow-lg">
+                        const isDragging = draggingKey === kupacKey;
+                        const isOver = dragOverKey === kupacKey && !!draggingKey;
+                        const dropLine = (
+                          <div style={{
+                            height: 4,
+                            borderRadius: 2,
+                            background: PRIMARY,
+                            margin: "4px 0",
+                            position: "relative",
+                            flexShrink: 0,
+                          }}>
+                            <div style={{ position: "absolute", left: -5, top: "50%", transform: "translateY(-50%)", width: 12, height: 12, borderRadius: "50%", background: PRIMARY }} />
+                            <div style={{ position: "absolute", right: -5, top: "50%", transform: "translateY(-50%)", width: 12, height: 12, borderRadius: "50%", background: PRIMARY }} />
+                          </div>
+                        );
+                        return [
+                          isOver && dragInsertBefore ? <div key={`line-before-${kupacKey}`}>{dropLine}</div> : null,
+                          <div
+                            key={kupacKey}
+                            data-kupac-key={kupacKey}
+                            className="relative rounded-xl overflow-hidden"
+                            style={{
+                              transition: "box-shadow 150ms ease, transform 150ms ease, opacity 150ms ease",
+                              opacity: isDragging ? 0.55 : 1,
+                              boxShadow: isDragging
+                                ? `0 24px 48px rgba(0,0,0,0.32), 0 0 0 3px ${PRIMARY}`
+                                : "0 4px 16px rgba(0,0,0,0.10)",
+                              transform: isDragging ? "scale(1.025) rotate(0.4deg)" : "scale(1)",
+                              zIndex: isDragging ? 20 : undefined,
+                            }}
+                          >
                             {/* Swipe overlay */}
                             <div
                               ref={(el) => { if (el) overlayRefs.current.set(kupacKey, el); else overlayRefs.current.delete(kupacKey); }}
@@ -1070,12 +1336,12 @@ export function AktivneNarudzbe({ onBack }: Props) {
                               className="bg-white rounded-xl overflow-hidden relative select-none"
                               style={{
                                 border: verifikovaniKupci.has(kupacKey)
-                                  ? "3px solid rgb(239 68 68)"
+                                  ? "3px solid #ef4444"
                                   : allFilled
                                     ? `2px solid ${SECONDARY}`
                                     : "2px solid rgb(229 231 235)",
                                 boxShadow: verifikovaniKupci.has(kupacKey)
-                                  ? "0 0 0 3px rgb(239 68 68)"
+                                  ? "0 0 0 3px #ef4444"
                                   : allFilled
                                     ? `0 0 0 3px ${SECONDARY}`
                                     : undefined,
@@ -1092,13 +1358,52 @@ export function AktivneNarudzbe({ onBack }: Props) {
                             >
                             {/* ─── Zaglavlje kupca ─── */}
                             <div
-                              className="px-6 py-4 border-b-2 border-gray-200 cursor-pointer select-none"
+                              className="px-4 py-4 border-b-2 border-gray-200 cursor-pointer select-none"
                               style={{
-                                background: `linear-gradient(to right, ${PRIMARY}18, ${SECONDARY}18)`,
+                                background: reorderMode
+                                  ? `linear-gradient(to right, ${PRIMARY}28, ${PRIMARY}10)`
+                                  : `linear-gradient(to right, ${PRIMARY}18, ${SECONDARY}18)`,
+                                touchAction: reorderMode ? "none" : "pan-y",
                               }}
-                              onClick={() => toggleKupac(kupacKey)}
+                              onClick={() => { if (!reorderMode) toggleKupac(kupacKey); }}
+                              onTouchStart={(e) => {
+                                if (!isAndroid) return;
+                                if (reorderMode) {
+                                  // U reorder modu: odmah počni drag
+                                  e.stopPropagation();
+                                  reorderDrag.current = {
+                                    active: false,
+                                    fromKey: kupacKey,
+                                    overKey: null,
+                                    insertBefore: true,
+                                    startY: e.touches[0].clientY,
+                                  };
+                                } else {
+                                  // Normalni mod: počni long press timer
+                                  const currentOrderKeys = sortedNarudzbePoKupcu.map(
+                                    k => getKupacGroupingKey(k.sifra_kupca, k.referentni_broj)
+                                  );
+                                  startLongPress(kupacKey, e.touches[0].clientX, e.touches[0].clientY, currentOrderKeys);
+                                }
+                              }}
+                              onTouchMove={(e) => {
+                                if (reorderMode) return;
+                                const dx = Math.abs(e.touches[0].clientX - longPressRef.current.startX);
+                                const dy = Math.abs(e.touches[0].clientY - longPressRef.current.startY);
+                                if (dx > 12 || dy > 12) cancelLongPress();
+                              }}
+                              onTouchEnd={() => {
+                                if (!reorderMode) cancelLongPress();
+                              }}
                             >
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2">
+                                {/* Drag handle — vidljiv samo u reorder modu */}
+                                {isAndroid && reorderMode && (
+                                  <GripVertical
+                                    className="w-6 h-6 flex-none"
+                                    style={{ color: PRIMARY, opacity: 0.7 }}
+                                  />
+                                )}
                                 <div className="flex items-baseline gap-3 flex-wrap flex-1">
                                   <h3
                                     className="text-xl font-bold"
@@ -1288,7 +1593,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                     borderColor:
                                                       saveStatus[key] ===
                                                       "error"
-                                                        ? "rgb(239 68 68)"
+                                                        ? "#ef4444"
                                                         : saveStatus[key] ===
                                                             "ok"
                                                           ? PRIMARY
@@ -1418,8 +1723,9 @@ export function AktivneNarudzbe({ onBack }: Props) {
                             </div>
                             )}
                             </div>
-                          </div>
-                        );
+                          </div>,
+                          isOver && !dragInsertBefore ? <div key={`line-after-${kupacKey}`}>{dropLine}</div> : null,
+                        ];
                       })}
                     </div>
                   ) : (
@@ -1453,12 +1759,12 @@ export function AktivneNarudzbe({ onBack }: Props) {
                               className="bg-white rounded-xl overflow-hidden relative select-none transition-all"
                               style={{
                                 border: verifikovaniProizvodi.has(proizvod.sif)
-                                  ? "3px solid rgb(239 68 68)"
+                                  ? "3px solid #ef4444"
                                   : allFilledP
                                     ? `2px solid ${SECONDARY}`
                                     : "2px solid rgb(229 231 235)",
                                 boxShadow: verifikovaniProizvodi.has(proizvod.sif)
-                                  ? "0 0 0 3px rgb(239 68 68)"
+                                  ? "0 0 0 3px #ef4444"
                                   : allFilledP
                                     ? `0 0 0 3px ${SECONDARY}`
                                     : undefined,
@@ -1652,7 +1958,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                   borderColor:
                                                     saveStatus[stavka.key] ===
                                                     "error"
-                                                      ? "rgb(239 68 68)"
+                                                      ? "#ef4444"
                                                       : saveStatus[
                                                             stavka.key
                                                           ] === "ok"
@@ -1970,10 +2276,10 @@ export function AktivneNarudzbe({ onBack }: Props) {
               handleSpremljenoChange(numKbState.key, val);
             }
           }}
-          onConfirm={() => {
+          onConfirm={(val) => {
             const { key, sifraTabele } = numKbState;
             setNumKbState(null);
-            handleSpremljenoBlur(key, sifraTabele, napomenaOp[key]);
+            handleSpremljenoBlur(key, sifraTabele, napomenaOp[key], val);
           }}
           onClose={() => setNumKbState(null)}
         />

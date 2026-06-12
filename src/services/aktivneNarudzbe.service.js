@@ -100,7 +100,8 @@ export const verifikujGrupu = async (sifraTabeleArray, verifikovano = 1) => {
           [sifraTabele, verifikovano],
         );
         const result = Array.isArray(rows) && rows.length > 0 ? rows[0][0] : null;
-        if (!result || result.success !== 1) {
+        console.log(`[verifikujGrupu] sifra_tabele=${sifraTabele} result:`, result);
+        if (!result || Number(result.success) !== 1) {
           await connection.rollback();
           return {
             success: false,

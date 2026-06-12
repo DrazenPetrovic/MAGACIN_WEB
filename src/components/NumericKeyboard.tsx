@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { X } from "lucide-react";
 import { theme } from "../theme";
 
@@ -8,50 +9,89 @@ interface Props {
   value: string;
   label?: string;
   onChange: (val: string) => void;
-  onConfirm: () => void;
+  onConfirm: (val?: string) => void;
   onClose: () => void;
 }
 
 export function NumericKeyboard({ value, label, onChange, onConfirm, onClose }: Props) {
-  const display = value === "-1.000" ? "" : value;
+  const [expr, setExpr] = useState<string>(
+    value === "-1.000" || value === "" ? "" : value,
+  );
 
+  // ─── Dijelovi izraza ──────────────────────────────────────────────────────
+  const plusIdx    = expr.indexOf("+");
+  const hasPlusOp  = plusIdx >= 0;
+  const currentPart = hasPlusOp ? expr.slice(plusIdx + 1) : expr;
+
+  // ─── Evaluacija ───────────────────────────────────────────────────────────
+  const evaluate = (): string => {
+    const cleaned = expr.endsWith("+") ? expr.slice(0, -1) : expr;
+    if (!cleaned) return "-1.000";
+    if (!hasPlusOp || expr.endsWith("+")) return cleaned;
+    const a = parseFloat(expr.slice(0, plusIdx)) || 0;
+    const b = parseFloat(expr.slice(plusIdx + 1)) || 0;
+    const result = Math.round((a + b) * 1000) / 1000;
+    return String(result);
+  };
+
+  // ─── Akcije tipki ─────────────────────────────────────────────────────────
   const pushDigit = (d: string) => {
-    if (value === "-1.000" || value === "") {
-      onChange(d);
-    } else {
-      if (value.length >= 10) return;
-      onChange(value + d);
-    }
+    if (currentPart.replace(".", "").length >= 9) return;
+    setExpr((e) => e + d);
   };
 
   const pushDot = () => {
-    if (value === "-1.000" || value === "") { onChange("0."); return; }
-    if (!value.includes(".")) onChange(value + ".");
+    if (currentPart.includes(".")) return;
+    setExpr((e) => (currentPart === "" ? e + "0." : e + "."));
+  };
+
+  const pushPlus = () => {
+    if (hasPlusOp || !expr || expr === "") return;
+    if (expr.endsWith(".")) { setExpr((e) => e.slice(0, -1) + "+"); return; }
+    setExpr((e) => e + "+");
   };
 
   const pushBack = () => {
-    if (value === "-1.000" || value === "" || value.length <= 1) { onChange(""); return; }
-    onChange(value.slice(0, -1));
+    setExpr((e) => (e.length <= 1 ? "" : e.slice(0, -1)));
   };
 
-  const pushMinusOne = () => onChange("-1.000");
+  const pushMinusOne = () => {
+    setExpr("-1.000");
+    onChange("-1.000");
+  };
 
-  type BtnKind = "num" | "back" | "minusone" | "ok";
+  const handleConfirm = () => {
+    const result = evaluate();
+    onChange(result);
+    onConfirm(result);
+  };
 
+  // ─── Display ──────────────────────────────────────────────────────────────
+  const isPreview  = hasPlusOp && !expr.endsWith("+");
+  const preview    = isPreview ? `= ${evaluate()}` : "";
+  const displayVal = expr || "";
+  const fontSize   = displayVal.length > 10 ? "1.4rem" : displayVal.length > 6 ? "1.8rem" : "2.4rem";
+
+  // ─── Boje ─────────────────────────────────────────────────────────────────
+  type BtnKind = "num" | "back" | "minusone" | "ok" | "plus" | "eq";
   const bg: Record<BtnKind, string> = {
     num:      "rgb(243 244 246)",
     back:     "rgb(254 243 199)",
     minusone: "rgb(254 226 226)",
-    ok:       SECONDARY,
+    ok:       `${PRIMARY}22`,
+    plus:     `${SECONDARY}33`,
+    eq:       SECONDARY,
   };
   const fg: Record<BtnKind, string> = {
     num:      "rgb(17 24 39)",
     back:     "rgb(180 83 9)",
     minusone: "rgb(185 28 28)",
-    ok:       "white",
+    ok:       PRIMARY,
+    plus:     SECONDARY,
+    eq:       "white",
   };
 
-  const buttons: { label: string; onPress: () => void; kind: BtnKind; span?: number }[] = [
+  const buttons: { label: string; onPress: () => void; kind: BtnKind }[] = [
     { label: "7",  onPress: () => pushDigit("7"), kind: "num" },
     { label: "8",  onPress: () => pushDigit("8"), kind: "num" },
     { label: "9",  onPress: () => pushDigit("9"), kind: "num" },
@@ -63,9 +103,11 @@ export function NumericKeyboard({ value, label, onChange, onConfirm, onClose }: 
     { label: "1",  onPress: () => pushDigit("1"), kind: "num" },
     { label: "2",  onPress: () => pushDigit("2"), kind: "num" },
     { label: "3",  onPress: () => pushDigit("3"), kind: "num" },
-    { label: "OK", onPress: onConfirm,             kind: "ok" },
-    { label: "0",  onPress: () => pushDigit("0"), kind: "num", span: 2 },
+    { label: "OK", onPress: handleConfirm,         kind: "ok" },
+    { label: "0",  onPress: () => pushDigit("0"), kind: "num" },
     { label: ".",  onPress: pushDot,               kind: "num" },
+    { label: "+",  onPress: pushPlus,              kind: "plus" },
+    { label: "=",  onPress: handleConfirm,         kind: "eq" },
   ];
 
   return (
@@ -81,10 +123,7 @@ export function NumericKeyboard({ value, label, onChange, onConfirm, onClose }: 
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
-          <span
-            className="text-sm font-semibold truncate flex-1 mr-2"
-            style={{ color: PRIMARY }}
-          >
+          <span className="text-sm font-semibold truncate flex-1 mr-2" style={{ color: PRIMARY }}>
             {label || "Unos količine"}
           </span>
           <button
@@ -97,26 +136,34 @@ export function NumericKeyboard({ value, label, onChange, onConfirm, onClose }: 
 
         {/* Display */}
         <div
-          className="rounded-2xl px-5 py-4 mb-4 text-right"
+          className="rounded-2xl px-5 py-3 mb-4"
           style={{
             backgroundColor: "rgb(249 250 251)",
-            border: `2px solid ${display ? PRIMARY : "rgb(229 231 235)"}`,
+            border: `2px solid ${displayVal ? PRIMARY : "rgb(229 231 235)"}`,
+            minHeight: "5rem",
           }}
         >
+          {/* Izraz */}
           <div
-            className="font-bold leading-none"
-            style={{
-              fontSize: display.length > 8 ? "1.8rem" : "2.5rem",
-              color: display ? PRIMARY : "rgb(209 213 219)",
-            }}
+            className="font-bold leading-none text-right"
+            style={{ fontSize, color: displayVal ? PRIMARY : "rgb(209 213 219)" }}
           >
-            {display || "0"}
+            {displayVal || "0"}
           </div>
+          {/* Preview rezultata */}
+          {preview && (
+            <div
+              className="text-right mt-1 font-semibold"
+              style={{ fontSize: "1rem", color: SECONDARY }}
+            >
+              {preview}
+            </div>
+          )}
         </div>
 
-        {/* Dugmad */}
+        {/* Dugmad — 4 kolone, svaka iste širine */}
         <div className="grid grid-cols-4 gap-2.5">
-          {buttons.map(({ label: btn, onPress, kind, span }, i) => (
+          {buttons.map(({ label: btn, onPress, kind }, i) => (
             <button
               key={i}
               onPointerDown={(e) => { e.preventDefault(); onPress(); }}
@@ -124,9 +171,8 @@ export function NumericKeyboard({ value, label, onChange, onConfirm, onClose }: 
               style={{
                 backgroundColor: bg[kind],
                 color: fg[kind],
-                fontSize: kind === "ok" || kind === "minusone" ? "1.1rem" : "1.35rem",
+                fontSize: kind === "ok" || kind === "minusone" ? "1rem" : kind === "plus" || kind === "eq" ? "1.4rem" : "1.35rem",
                 height: "3.75rem",
-                gridColumn: span ? `span ${span}` : undefined,
               }}
             >
               {btn}
