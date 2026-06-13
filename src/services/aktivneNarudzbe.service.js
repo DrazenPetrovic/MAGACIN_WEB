@@ -90,6 +90,7 @@ export const getArhiviraneNarudzbeGrupisano = async () => {
 // Sve stavke moraju biti popunjene (provjera je na frontendu),
 // a sve se ažuriraju u jednoj transakciji — ili sve ili ništa.
 export const verifikujGrupu = async (sifraTabeleArray, verifikovano = 1) => {
+  console.log('[verifikujGrupu] POZIV — sifraTabeleArray:', sifraTabeleArray, '| verifikovano:', verifikovano);
   return withConnection(async (connection) => {
     await connection.beginTransaction();
     try {

@@ -22,6 +22,7 @@ import { NumericKeyboard } from "./NumericKeyboard";
 import { theme } from "../theme";
 import { apiFetch } from "../utils/apiFetch";
 import { Capacitor } from "@capacitor/core";
+import { SpeechRecognition } from "@capacitor-community/speech-recognition";
 
 const PRIMARY = theme.primary; // #785E9E
 const SECONDARY = theme.secondary; // #8FC74A
@@ -212,7 +213,49 @@ export function AktivneNarudzbe({ onBack }: Props) {
   const rowKey = (kupacKey: string, sif: string, idx: number) =>
     `${kupacKey}::${sif}::${idx}`;
 
-  const startSearchVoice = () => {
+  const startSearchVoice = async () => {
+    if (isAndroid) {
+      try {
+        const { available } = await SpeechRecognition.available();
+        if (!available) { alert("Glasovni unos nije dostupan na ovom uređaju."); return; }
+
+        // Provjeri trenutni status dozvole
+        let permStatus = await SpeechRecognition.checkPermissions();
+        if (permStatus.speechRecognition !== "granted") {
+          // Pokušaj zatražiti dozvolu
+          permStatus = await SpeechRecognition.requestPermissions();
+        }
+        if (permStatus.speechRecognition !== "granted") {
+          alert("Mikrofon je onemogućen.\nIdi na: Podešavanja → Aplikacije → Magacin → Dozvole → Mikrofon → Dozvoli");
+          return;
+        }
+
+        setSearchListening(true);
+        SpeechRecognition.removeAllListeners();
+
+        SpeechRecognition.addListener("results", (data: { matches: string[] }) => {
+          if (data.matches && data.matches.length > 0) setSearchQuery(data.matches[0]);
+          setSearchListening(false);
+          SpeechRecognition.removeAllListeners();
+        });
+        SpeechRecognition.addListener("listeningState", (state: { status: string }) => {
+          if (state.status === "stopped") {
+            setSearchListening(false);
+            SpeechRecognition.removeAllListeners();
+          }
+        });
+
+        await SpeechRecognition.start({
+          language: "bs-BA",
+          maxResults: 1,
+          popup: false,
+          partialResults: false,
+        });
+      } catch {
+        setSearchListening(false);
+      }
+      return;
+    }
     const SRCtor = getSpeechRecognition();
     if (!SRCtor) { alert("Preglednik ne podržava glasovni unos."); return; }
     const rec = new SRCtor();
@@ -240,6 +283,18 @@ export function AktivneNarudzbe({ onBack }: Props) {
   useEffect(() => { kupacCustomOrderRef.current = kupacCustomOrder; }, [kupacCustomOrder]);
   useEffect(() => { dragOverKeyRef.current = dragOverKey; }, [dragOverKey]);
 
+  // Crveni border po kupcu — automatski kad su svi njegovi proizvodi verifikovani
+  useEffect(() => {
+    const newSet = new Set<string>();
+    narudzbePoKupcu.forEach(kupac => {
+      const kKey = getKupacGroupingKey(kupac.sifra_kupca, kupac.referentni_broj);
+      if (kupac.proizvodi.length > 0 && kupac.proizvodi.every(p => verifikovaniProizvodi.has(String(p.sif)))) {
+        newSet.add(kKey);
+      }
+    });
+    setVerifikovaniKupci(newSet);
+  }, [verifikovaniProizvodi, narudzbePoKupcu]);
+
   const handleDragStart = useCallback((
     e: React.TouchEvent | React.MouseEvent,
     key: string,
@@ -251,6 +306,9 @@ export function AktivneNarudzbe({ onBack }: Props) {
     const clientX = "touches" in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
     const clientY = "touches" in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
     swipeDrag.current = { active: true, key, startX: clientX, startY: clientY, isHorizontal: null, canVerify, sifraTabeleArray };
+    if (key.startsWith("prod_")) {
+      console.log("[DragStart-prod] key:", key, "| canVerify:", canVerify, "| sifraTabeleArray:", sifraTabeleArray);
+    }
   }, []);
 
   useEffect(() => {
@@ -285,6 +343,9 @@ export function AktivneNarudzbe({ onBack }: Props) {
       const overlay = overlayRefs.current.get(drag.key);
       const swipedFar = drag.isHorizontal === true && dx >= SWIPE_THRESHOLD;
       const verified = swipedFar && drag.canVerify;
+      if (drag.key.startsWith("prod_")) {
+        console.log("[onEnd-prod] dx:", dx, "| isHorizontal:", drag.isHorizontal, "| swipedFar:", swipedFar, "| canVerify:", drag.canVerify, "| verified:", verified, "| sifraTabeleArray:", drag.sifraTabeleArray);
+      }
       if (swipedFar && !drag.canVerify) {
         // Swipe je prošao threshold ali stavke nisu sve popunjene
         setVerifikacijaGreska("Popunite sve stavke prije verifikacije");
@@ -302,19 +363,11 @@ export function AktivneNarudzbe({ onBack }: Props) {
           // 2) resetuj poziciju bez animacije (overlay još pokriven)
           if (card) { card.style.transition = "none"; card.style.transform = "translateX(0)"; }
           // 3) ažuriraj state (crveni border se pojavljuje)
-          if (drag.key.startsWith("prod_")) {
-            setVerifikovaniProizvodi(prev => new Set([...prev, drag.key.slice(5)]));
-          } else {
-            setVerifikovaniKupci(prev => new Set([...prev, drag.key]));
-          }
+          setVerifikovaniProizvodi(prev => new Set([...prev, drag.key.slice(5)]));
           // 4) API poziv — snimanje u bazu
           const revertKey = drag.key;
           const revertVerifikaciju = () => {
-            if (revertKey.startsWith("prod_")) {
-              setVerifikovaniProizvodi(prev => { const n = new Set(prev); n.delete(revertKey.slice(5)); return n; });
-            } else {
-              setVerifikovaniKupci(prev => { const n = new Set(prev); n.delete(revertKey); return n; });
-            }
+            setVerifikovaniProizvodi(prev => { const n = new Set(prev); n.delete(revertKey.slice(5)); return n; });
           };
           const showGreska = (msg: string) => {
             setVerifikacijaGreska(msg);
@@ -328,7 +381,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
             })
               .then((r) => r.json())
               .then((data) => {
-                console.log("[Verifikacija] Odgovor:", data);
+                console.log("[Verifikacija] Odgovor:", JSON.stringify(data));
                 if (!data.success) {
                   revertVerifikaciju();
                   showGreska(data.message || data.poruka || "Greška pri verifikaciji");
@@ -344,14 +397,15 @@ export function AktivneNarudzbe({ onBack }: Props) {
             revertVerifikaciju();
             showGreska("Verifikacija nije moguća: nema sifra_tabele u podacima");
           }
-          // 5) fade out overlaya
+          // 5) prebaci overlay u crvenu, pa fade out
+          if (overlay) overlay.style.background = "#ef4444";
           setTimeout(() => {
-            if (overlay) { overlay.style.transition = "opacity 250ms ease"; overlay.style.opacity = "0"; }
+            if (overlay) { overlay.style.transition = "opacity 400ms ease"; overlay.style.opacity = "0"; }
             setTimeout(() => {
               if (card) card.style.transition = "";
-              if (overlay) overlay.style.transition = "";
-            }, 260);
-          }, 50);
+              if (overlay) { overlay.style.transition = ""; overlay.style.background = ""; }
+            }, 420);
+          }, 120);
         }, 330);
       } else {
         if (card) { card.style.transition = "transform 250ms cubic-bezier(0.25,0.46,0.45,0.94)"; card.style.transform = "translateX(0)"; }
@@ -737,17 +791,9 @@ export function AktivneNarudzbe({ onBack }: Props) {
           });
         });
         // ─── Inicijalizacija verifikacije iz baze ─────────────────────────────
-        const initialVerifikovaniKupci = new Set<string>();
         const prodVerMap = new Map<string, { total: number; verified: number }>();
 
         finalList.forEach((kupac) => {
-          const kKey = getKupacGroupingKey(kupac.sifra_kupca, kupac.referentni_broj);
-          if (
-            kupac.proizvodi.length > 0 &&
-            kupac.proizvodi.every((p) => p.verifikovano === 1)
-          ) {
-            initialVerifikovaniKupci.add(kKey);
-          }
           kupac.proizvodi.forEach((p) => {
             const entry = prodVerMap.get(p.sif) ?? { total: 0, verified: 0 };
             entry.total++;
@@ -759,11 +805,10 @@ export function AktivneNarudzbe({ onBack }: Props) {
         const initialVerifikovaniProizvodi = new Set<string>();
         prodVerMap.forEach((entry, sif) => {
           if (entry.total > 0 && entry.verified === entry.total) {
-            initialVerifikovaniProizvodi.add(sif);
+            initialVerifikovaniProizvodi.add(String(sif));
           }
         });
 
-        setVerifikovaniKupci(initialVerifikovaniKupci);
         setVerifikovaniProizvodi(initialVerifikovaniProizvodi);
         setSpremljeno(initialSpremljeno);
         setSaveStatus(initialSaveStatus);
@@ -1187,7 +1232,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                       className="relative flex items-center gap-2 px-4 py-2 rounded-[10px] font-semibold text-sm active:scale-95 transition-transform"
                       style={{
                         background: spremljenoCount === totalProizvoda ? `${SECONDARY}22` : 'white',
-                        color: spremljenoCount === totalProizvoda ? SECONDARY : PRIMARY,
+                        color: PRIMARY,
                       }}
                       title="Klikni za osvježavanje narudžbi"
                     >
@@ -1320,19 +1365,8 @@ export function AktivneNarudzbe({ onBack }: Props) {
                               zIndex: isDragging ? 20 : undefined,
                             }}
                           >
-                            {/* Swipe overlay */}
-                            <div
-                              ref={(el) => { if (el) overlayRefs.current.set(kupacKey, el); else overlayRefs.current.delete(kupacKey); }}
-                              className="absolute inset-0 flex items-center pl-6 pointer-events-none"
-                              style={{ background: SECONDARY, opacity: 0 }}
-                            >
-                              <CheckCircle2 className="w-8 h-8 flex-none" style={{ color: "white" }} />
-                              <span className="ml-3 font-bold text-base" style={{ color: "white" }}>Verificirano</span>
-                            </div>
-
                             {/* Card */}
                             <div
-                              ref={(el) => { if (el) cardRefs.current.set(kupacKey, el); else cardRefs.current.delete(kupacKey); }}
                               className="bg-white rounded-xl overflow-hidden relative select-none"
                               style={{
                                 border: verifikovaniKupci.has(kupacKey)
@@ -1345,16 +1379,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                   : allFilled
                                     ? `0 0 0 3px ${SECONDARY}`
                                     : undefined,
-                                touchAction: 'pan-y',
                               }}
-                              onTouchStart={(e) => handleDragStart(
-                                e, kupacKey, allFilled,
-                                kupac.proizvodi.map(p => p.sifra_tabele).filter((s): s is number => s != null),
-                              )}
-                              onMouseDown={(e) => handleDragStart(
-                                e, kupacKey, allFilled,
-                                kupac.proizvodi.map(p => p.sifra_tabele).filter((s): s is number => s != null),
-                              )}
                             >
                             {/* ─── Zaglavlje kupca ─── */}
                             <div
@@ -1677,7 +1702,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                 {saveStatus[key] === "ok" && (
                                                   <CheckCircle2
                                                     className="w-3 h-3"
-                                                    style={{ color: SECONDARY }}
+                                                    style={{ color: (verifikovaniProizvodi.has(String(proizvod.sif)) || proizvod.verifikovano === 1) ? "#ef4444" : SECONDARY }}
                                                   />
                                                 )}
                                                 {saveStatus[key] ===
@@ -1758,12 +1783,12 @@ export function AktivneNarudzbe({ onBack }: Props) {
                               ref={(el) => { if (el) cardRefs.current.set(`prod_${proizvod.sif}`, el); else cardRefs.current.delete(`prod_${proizvod.sif}`); }}
                               className="bg-white rounded-xl overflow-hidden relative select-none transition-all"
                               style={{
-                                border: verifikovaniProizvodi.has(proizvod.sif)
+                                border: verifikovaniProizvodi.has(String(proizvod.sif))
                                   ? "3px solid #ef4444"
                                   : allFilledP
                                     ? `2px solid ${SECONDARY}`
                                     : "2px solid rgb(229 231 235)",
-                                boxShadow: verifikovaniProizvodi.has(proizvod.sif)
+                                boxShadow: verifikovaniProizvodi.has(String(proizvod.sif))
                                   ? "0 0 0 3px #ef4444"
                                   : allFilledP
                                     ? `0 0 0 3px ${SECONDARY}`
