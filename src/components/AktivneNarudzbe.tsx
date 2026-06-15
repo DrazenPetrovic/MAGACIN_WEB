@@ -1620,8 +1620,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                             className="px-4 py-3 align-top"
                                             onClick={(e) => e.stopPropagation()}
                                           >
-                                            <div className="flex flex-col items-end gap-1">
-                                              <div className="flex items-center gap-1">
+                                            <div className="flex items-center gap-1">
                                                 <input
                                                   ref={(el) =>
                                                     inputRefs.current.set(
@@ -1743,33 +1742,28 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                   "error" && (
                                                   <XCircle className="w-3 h-3 text-red-500" />
                                                 )}
-                                              </div>
                                               <button
                                                 type="button"
-                                                onClick={() =>
+                                                onClick={() => {
+                                                  if (jeVerifikovan) return;
                                                   setNoteModal({
                                                     key,
                                                     sifra_tabele:
                                                       proizvod.sifra_tabele,
                                                     title: `${proizvod.sif}${proizvod.sifra_tabele ? ` (${proizvod.sifra_tabele})` : ""} — ${proizvod.naziv_proizvoda}`,
-                                                  })
-                                                }
-                                                className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all self-end"
-                                                style={{
-                                                  backgroundColor: napomenaOp[
-                                                    key
-                                                  ]
-                                                    ? `${SECONDARY}22`
-                                                    : `${PRIMARY}10`,
-                                                  color: napomenaOp[key]
-                                                    ? SECONDARY
-                                                    : PRIMARY,
+                                                  });
                                                 }}
+                                                disabled={jeVerifikovan}
+                                                className="p-1.5 rounded-lg transition-all"
+                                                style={{
+                                                  backgroundColor: napomenaOp[key] ? `${SECONDARY}22` : `${PRIMARY}10`,
+                                                  color: jeVerifikovan ? "rgb(156 163 175)" : napomenaOp[key] ? SECONDARY : PRIMARY,
+                                                  opacity: jeVerifikovan ? 0.4 : 1,
+                                                  cursor: jeVerifikovan ? "default" : "pointer",
+                                                }}
+                                                title={jeVerifikovan ? "Verificirano — izmjena nije moguća" : napomenaOp[key] ? `Napomena: ${napomenaOp[key]}` : "Dodaj napomenu"}
                                               >
-                                                <MessageSquare className="w-3 h-3" />
-                                                {napomenaOp[key]
-                                                  ? "napomena ✓"
-                                                  : "napomena"}
+                                                <MessageSquare className="w-4 h-4" />
                                               </button>
                                             </div>
                                           </td>
@@ -1992,8 +1986,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                           className="px-4 py-3 align-top"
                                           onClick={(e) => e.stopPropagation()}
                                         >
-                                          <div className="flex flex-col items-end gap-1">
-                                            <div className="flex items-center gap-1">
+                                          <div className="flex items-center gap-1">
                                               <input
                                                 ref={(el) =>
                                                   inputRefs.current.set(
@@ -2120,34 +2113,29 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                 "error" && (
                                                 <XCircle className="w-3 h-3 text-red-500" />
                                               )}
-                                            </div>
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                setNoteModal({
-                                                  key: stavka.key,
-                                                  sifra_tabele:
-                                                    stavka.sifra_tabele,
-                                                  title: `${proizvod.sif}${proizvod.sifra_tabele ? ` (${proizvod.sifra_tabele})` : ""} — ${proizvod.naziv}`,
-                                                })
-                                              }
-                                              className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all self-end"
-                                              style={{
-                                                backgroundColor: napomenaOp[
-                                                  stavka.key
-                                                ]
-                                                  ? `${SECONDARY}22`
-                                                  : `${PRIMARY}10`,
-                                                color: napomenaOp[stavka.key]
-                                                  ? SECONDARY
-                                                  : PRIMARY,
-                                              }}
-                                            >
-                                              <MessageSquare className="w-3 h-3" />
-                                              {napomenaOp[stavka.key]
-                                                ? "napomena ✓"
-                                                : "napomena"}
-                                            </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  if (jeVerifikovan) return;
+                                                  setNoteModal({
+                                                    key: stavka.key,
+                                                    sifra_tabele:
+                                                      stavka.sifra_tabele,
+                                                    title: `${proizvod.sif}${proizvod.sifra_tabele ? ` (${proizvod.sifra_tabele})` : ""} — ${proizvod.naziv}`,
+                                                  });
+                                                }}
+                                                disabled={jeVerifikovan}
+                                                className="p-1.5 rounded-lg transition-all"
+                                                style={{
+                                                  backgroundColor: napomenaOp[stavka.key] ? `${SECONDARY}22` : `${PRIMARY}10`,
+                                                  color: jeVerifikovan ? "rgb(156 163 175)" : napomenaOp[stavka.key] ? SECONDARY : PRIMARY,
+                                                  opacity: jeVerifikovan ? 0.4 : 1,
+                                                  cursor: jeVerifikovan ? "default" : "pointer",
+                                                }}
+                                                title={jeVerifikovan ? "Verificirano — izmjena nije moguća" : napomenaOp[stavka.key] ? `Napomena: ${napomenaOp[stavka.key]}` : "Dodaj napomenu"}
+                                              >
+                                                <MessageSquare className="w-4 h-4" />
+                                              </button>
                                           </div>
                                         </td>
                                       </tr>
