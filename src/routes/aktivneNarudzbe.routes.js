@@ -6,6 +6,9 @@ const router = Router();
 // Ažuriraj količinu i napomenu za stavku
 router.post('/azuriraj', AktivneNarudzbeController.azurirajProizvod);
 
+// Resetuj količinu na -1 (stanje "nije uneseno")
+router.post('/reset', AktivneNarudzbeController.resetProizvod);
+
 // Verifikacija grupe stavki (svi isti kupac ili svi isti proizvod)
 router.post('/verifikacija', AktivneNarudzbeController.verifikujGrupu);
 

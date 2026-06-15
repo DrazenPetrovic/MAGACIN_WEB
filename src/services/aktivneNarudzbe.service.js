@@ -41,6 +41,16 @@ export const getAktivneNarudzbeGrupisano = async (sifraTerena) => {
   });
 };
 
+export const resetProizvod = async (sifraPolja, kolicina) => {
+  return withConnection(async (connection) => {
+    const [rows] = await connection.execute(
+      "CALL erp.sp_dostava_tereni_proizvodi_azuriranje_magacin_reset(?, ?)",
+      [sifraPolja, kolicina],
+    );
+    return Array.isArray(rows) && rows.length > 0 ? rows[0][0] : null;
+  });
+};
+
 export const azurirajProizvod = async (
   sifraPolja,
   kolicinaZaUnos,

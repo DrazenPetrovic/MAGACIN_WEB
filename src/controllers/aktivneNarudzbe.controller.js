@@ -1,5 +1,24 @@
 import * as AktivneNarudzbeService from '../services/aktivneNarudzbe.service.js';
 
+// POST /api/aktivne-narudzbe-teren/reset
+// Resetuje spremljenu_kolicinu na -1 (stanje "nije uneseno")
+export const resetProizvod = async (req, res) => {
+  try {
+    const { sifraPolja, kolicina } = req.body;
+    if (!sifraPolja || kolicina === undefined) {
+      return res.status(400).json({ success: false, message: 'sifraPolja i kolicina su obavezni' });
+    }
+    const result = await AktivneNarudzbeService.resetProizvod(Number(sifraPolja), Number(kolicina));
+    if (result && (result.STATUS === 'OK' || result.status === 'OK')) {
+      return res.json({ success: true, data: result });
+    }
+    return res.status(400).json({ success: false, message: result?.poruka || 'Zapis nije pronađen' });
+  } catch (error) {
+    console.error('resetProizvod error:', error);
+    return res.status(500).json({ success: false, message: 'Greška pri resetovanju' });
+  }
+};
+
 // POST /api/aktivne-narudzbe-teren/azuriraj
 export const azurirajProizvod = async (req, res) => {
   try {

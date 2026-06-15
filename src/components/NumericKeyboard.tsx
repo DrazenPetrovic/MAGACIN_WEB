@@ -19,18 +19,16 @@ export function NumericKeyboard({ value, label, onChange, onConfirm, onClose }: 
   );
 
   // ─── Dijelovi izraza ──────────────────────────────────────────────────────
-  const plusIdx    = expr.indexOf("+");
-  const hasPlusOp  = plusIdx >= 0;
-  const currentPart = hasPlusOp ? expr.slice(plusIdx + 1) : expr;
+  const lastPlusIdx = expr.lastIndexOf("+");
+  const hasPlusOp   = lastPlusIdx >= 0;
+  const currentPart = hasPlusOp ? expr.slice(lastPlusIdx + 1) : expr;
 
   // ─── Evaluacija ───────────────────────────────────────────────────────────
   const evaluate = (): string => {
     const cleaned = expr.endsWith("+") ? expr.slice(0, -1) : expr;
     if (!cleaned) return "-1.000";
-    if (!hasPlusOp || expr.endsWith("+")) return cleaned;
-    const a = parseFloat(expr.slice(0, plusIdx)) || 0;
-    const b = parseFloat(expr.slice(plusIdx + 1)) || 0;
-    const result = Math.round((a + b) * 1000) / 1000;
+    const parts = cleaned.split("+");
+    const result = Math.round(parts.reduce((sum, p) => sum + (parseFloat(p) || 0), 0) * 1000) / 1000;
     return String(result);
   };
 
@@ -46,7 +44,7 @@ export function NumericKeyboard({ value, label, onChange, onConfirm, onClose }: 
   };
 
   const pushPlus = () => {
-    if (hasPlusOp || !expr || expr === "") return;
+    if (!expr || expr === "" || expr.endsWith("+")) return;
     if (expr.endsWith(".")) { setExpr((e) => e.slice(0, -1) + "+"); return; }
     setExpr((e) => e + "+");
   };

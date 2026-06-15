@@ -593,6 +593,26 @@ export function AktivneNarudzbe({ onBack }: Props) {
     rec.start();
   };
 
+  const handleSpremljenoReset = async (key: string, sifraTabele: number | undefined) => {
+    if (!sifraTabele) return;
+    setSaveStatus((p) => ({ ...p, [key]: "saving" }));
+    try {
+      const res = await apiFetch(`${API_URL}/api/aktivne-narudzbe-teren/reset`, {
+        method: "POST",
+        body: JSON.stringify({ sifraPolja: sifraTabele, kolicina: -1 }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSpremljeno((p) => ({ ...p, [key]: "-1.000" }));
+        setSaveStatus((p) => { const n = { ...p }; delete n[key]; return n; });
+      } else {
+        setSaveStatus((p) => ({ ...p, [key]: "error" }));
+      }
+    } catch {
+      setSaveStatus((p) => ({ ...p, [key]: "error" }));
+    }
+  };
+
   const handleSpremljenoBlur = async (
     key: string,
     sifraTabele: number | undefined,
@@ -1523,6 +1543,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                     kupac.proizvodi.map((proizvod, index) => {
                                       const key = rowKey(kupacKey, proizvod.sif, index);
                                       const isListening = voiceKey === key;
+                                      const jeVerifikovan = verifikovaniProizvodi.has(String(proizvod.sif)) || proizvod.verifikovano === 1;
                                       return (
                                         <tr
                                           key={key}
@@ -1540,6 +1561,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                 : undefined
                                           }
                                           onClick={() => {
+                                            if (jeVerifikovan) return;
                                             const hasVal =
                                               spremljeno[key] &&
                                               spremljeno[key] !== "-1.000";
@@ -1572,10 +1594,15 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                           >
                                             {proizvod.jm.toLowerCase() !== "kg" ? (
                                               <span
-                                                className="inline-block text-base font-bold px-3 py-3 rounded-lg cursor-pointer active:scale-95 transition-transform"
-                                                style={{ backgroundColor: `${SECONDARY}22`, color: SECONDARY }}
+                                                className="inline-block text-base font-bold px-3 py-3 rounded-lg transition-transform"
+                                                style={{
+                                                  backgroundColor: `${SECONDARY}22`,
+                                                  color: jeVerifikovan ? "rgb(156 163 175)" : SECONDARY,
+                                                  cursor: jeVerifikovan ? "default" : "pointer",
+                                                }}
                                                 onClick={(e) => {
                                                   e.stopPropagation();
+                                                  if (jeVerifikovan) return;
                                                   const val = String(proizvod.kolicina);
                                                   setSpremljeno(p => ({ ...p, [key]: val }));
                                                   handleSpremljenoBlur(key, proizvod.sifra_tabele, napomenaOp[key], val);
@@ -1637,9 +1664,10 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                           ? `${PRIMARY}10`
                                                           : "",
                                                   }}
-                                                  readOnly={isAndroid}
+                                                  readOnly={isAndroid || jeVerifikovan}
                                                   onMouseDown={(e) => {
                                                     if (isAndroid) return;
+                                                    if (jeVerifikovan) return;
                                                     if (
                                                       spremljeno[key] &&
                                                       spremljeno[key] !== "-1.000"
@@ -1650,6 +1678,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                   }}
                                                   onClick={() => {
                                                     if (!isAndroid) return;
+                                                    if (jeVerifikovan) return;
                                                     if (spremljeno[key] && spremljeno[key] !== "-1.000") {
                                                       setConfirmKey(key);
                                                     } else {
@@ -1657,7 +1686,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                     }
                                                   }}
                                                   onFocus={(e) => {
-                                                    if (isAndroid) { e.target.blur(); return; }
+                                                    if (isAndroid || jeVerifikovan) { e.target.blur(); return; }
                                                     e.target.style.backgroundColor = "white";
                                                     if (spremljeno[key] === "-1.000") {
                                                       setSpremljeno((p) => ({ ...p, [key]: "" }));
@@ -1666,7 +1695,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                     }
                                                   }}
                                                   onBlur={(e) => {
-                                                    if (isAndroid) return;
+                                                    if (isAndroid || jeVerifikovan) return;
                                                     e.target.style.backgroundColor = "";
                                                     handleSpremljenoBlur(
                                                       key,
@@ -1677,9 +1706,11 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                 />
                                                 <button
                                                   type="button"
-                                                  onClick={() =>
-                                                    startVoice(key)
-                                                  }
+                                                  onClick={() => {
+                                                    if (jeVerifikovan) return;
+                                                    startVoice(key);
+                                                  }}
+                                                  disabled={jeVerifikovan}
                                                   className="p-2 rounded-lg transition-all"
                                                   style={{
                                                     backgroundColor: isListening
@@ -1687,9 +1718,12 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                       : `${PRIMARY}18`,
                                                     color: isListening
                                                       ? "#dc2626"
-                                                      : PRIMARY,
+                                                      : jeVerifikovan
+                                                        ? "rgb(156 163 175)"
+                                                        : PRIMARY,
+                                                    opacity: jeVerifikovan ? 0.4 : 1,
                                                   }}
-                                                  title="Glasovni unos"
+                                                  title={jeVerifikovan ? "Verificirano — izmjena nije moguća" : "Glasovni unos"}
                                                 >
                                                   <Mic
                                                     className={`w-4 h-4 ${isListening ? "animate-pulse" : ""}`}
@@ -1899,6 +1933,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                 <tbody className="bg-white divide-y divide-gray-200">
                                   {proizvod.stavke.map((stavka) => {
                                     const isListening = voiceKey === stavka.key;
+                                    const jeVerifikovan = verifikovaniProizvodi.has(String(proizvod.sif));
                                     return (
                                       <tr
                                         key={stavka.key}
@@ -1916,6 +1951,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                               : undefined
                                         }
                                         onClick={() => {
+                                          if (jeVerifikovan) return;
                                           const hasVal =
                                             spremljeno[stavka.key] &&
                                             spremljeno[stavka.key] !== "-1.000";
@@ -2004,9 +2040,10 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                         ? `${PRIMARY}10`
                                                         : "",
                                                 }}
-                                                readOnly={isAndroid}
+                                                readOnly={isAndroid || jeVerifikovan}
                                                 onMouseDown={(e) => {
                                                   if (isAndroid) return;
+                                                  if (jeVerifikovan) return;
                                                   if (
                                                     spremljeno[stavka.key] &&
                                                     spremljeno[stavka.key] !== "-1.000"
@@ -2017,6 +2054,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                 }}
                                                 onClick={() => {
                                                   if (!isAndroid) return;
+                                                  if (jeVerifikovan) return;
                                                   if (spremljeno[stavka.key] && spremljeno[stavka.key] !== "-1.000") {
                                                     setConfirmKey(stavka.key);
                                                   } else {
@@ -2024,7 +2062,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                   }
                                                 }}
                                                 onFocus={(e) => {
-                                                  if (isAndroid) { e.target.blur(); return; }
+                                                  if (isAndroid || jeVerifikovan) { e.target.blur(); return; }
                                                   e.target.style.backgroundColor = "white";
                                                   if (spremljeno[stavka.key] === "-1.000") {
                                                     setSpremljeno((p) => ({ ...p, [stavka.key]: "" }));
@@ -2033,7 +2071,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                   }
                                                 }}
                                                 onBlur={(e) => {
-                                                  if (isAndroid) return;
+                                                  if (isAndroid || jeVerifikovan) return;
                                                   e.target.style.backgroundColor = "";
                                                   handleSpremljenoBlur(
                                                     stavka.key,
@@ -2044,9 +2082,11 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                               />
                                               <button
                                                 type="button"
-                                                onClick={() =>
-                                                  startVoice(stavka.key)
-                                                }
+                                                onClick={() => {
+                                                  if (jeVerifikovan) return;
+                                                  startVoice(stavka.key);
+                                                }}
+                                                disabled={jeVerifikovan}
                                                 className="p-2 rounded-lg transition-all"
                                                 style={{
                                                   backgroundColor: isListening
@@ -2054,9 +2094,12 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                     : `${PRIMARY}18`,
                                                   color: isListening
                                                     ? "#dc2626"
-                                                    : PRIMARY,
+                                                    : jeVerifikovan
+                                                      ? "rgb(156 163 175)"
+                                                      : PRIMARY,
+                                                  opacity: jeVerifikovan ? 0.4 : 1,
                                                 }}
-                                                title="Glasovni unos"
+                                                title={jeVerifikovan ? "Verificirano — izmjena nije moguća" : "Glasovni unos"}
                                               >
                                                 <Mic
                                                   className={`w-4 h-4 ${isListening ? "animate-pulse" : ""}`}
@@ -2304,7 +2347,11 @@ export function AktivneNarudzbe({ onBack }: Props) {
           onConfirm={(val) => {
             const { key, sifraTabele } = numKbState;
             setNumKbState(null);
-            handleSpremljenoBlur(key, sifraTabele, napomenaOp[key], val);
+            if (val === "-1.000" && saveStatus[key] === "ok") {
+              handleSpremljenoReset(key, sifraTabele);
+            } else if (val !== "-1.000") {
+              handleSpremljenoBlur(key, sifraTabele, napomenaOp[key], val);
+            }
           }}
           onClose={() => setNumKbState(null)}
         />
