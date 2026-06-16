@@ -1617,10 +1617,22 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                             )}
                                           </td>
                                           <td
-                                            className="px-4 py-3 align-top"
+                                            className={`${isAndroid ? "pl-4 pr-2" : "px-4"} py-3 align-top`}
                                             onClick={(e) => e.stopPropagation()}
                                           >
                                             <div className="flex items-center gap-1">
+                                                {isAndroid && saveStatus[key] === "saving" && (
+                                                  <Loader className="w-3 h-3 animate-spin text-gray-400" />
+                                                )}
+                                                {isAndroid && saveStatus[key] === "ok" && (
+                                                  <CheckCircle2
+                                                    className="w-3 h-3"
+                                                    style={{ color: (verifikovaniProizvodi.has(String(proizvod.sif)) || proizvod.verifikovano === 1) ? "#ef4444" : SECONDARY }}
+                                                  />
+                                                )}
+                                                {isAndroid && saveStatus[key] === "error" && (
+                                                  <XCircle className="w-3 h-3 text-red-500" />
+                                                )}
                                                 <input
                                                   ref={(el) =>
                                                     inputRefs.current.set(
@@ -1639,7 +1651,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                     )
                                                   }
                                                   placeholder="-1.000"
-                                                  className="w-24 text-right text-sm font-bold border-2 rounded-lg px-2 py-2 focus:outline-none transition"
+                                                  className={`w-24 text-right text-sm font-bold border-2 rounded-lg px-2 py-2 focus:outline-none transition${isAndroid ? " ml-auto" : ""}`}
                                                   style={{
                                                     borderColor:
                                                       saveStatus[key] ===
@@ -1703,6 +1715,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                     );
                                                   }}
                                                 />
+                                                {!isAndroid && (
                                                 <button
                                                   type="button"
                                                   onClick={() => {
@@ -1728,17 +1741,18 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                     className={`w-4 h-4 ${isListening ? "animate-pulse" : ""}`}
                                                   />
                                                 </button>
-                                                {saveStatus[key] ===
+                                                )}
+                                                {!isAndroid && saveStatus[key] ===
                                                   "saving" && (
                                                   <Loader className="w-3 h-3 animate-spin text-gray-400" />
                                                 )}
-                                                {saveStatus[key] === "ok" && (
+                                                {!isAndroid && saveStatus[key] === "ok" && (
                                                   <CheckCircle2
                                                     className="w-3 h-3"
                                                     style={{ color: (verifikovaniProizvodi.has(String(proizvod.sif)) || proizvod.verifikovano === 1) ? "#ef4444" : SECONDARY }}
                                                   />
                                                 )}
-                                                {saveStatus[key] ===
+                                                {!isAndroid && saveStatus[key] ===
                                                   "error" && (
                                                   <XCircle className="w-3 h-3 text-red-500" />
                                                 )}
@@ -1754,7 +1768,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                   });
                                                 }}
                                                 disabled={jeVerifikovan}
-                                                className="p-1.5 rounded-lg transition-all"
+                                                className={`${isAndroid ? "p-1" : "p-1.5"} rounded-lg transition-all`}
                                                 style={{
                                                   backgroundColor: napomenaOp[key] ? `${SECONDARY}22` : `${PRIMARY}10`,
                                                   color: jeVerifikovan ? "rgb(156 163 175)" : napomenaOp[key] ? SECONDARY : PRIMARY,
@@ -1763,7 +1777,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                 }}
                                                 title={jeVerifikovan ? "Verificirano — izmjena nije moguća" : napomenaOp[key] ? `Napomena: ${napomenaOp[key]}` : "Dodaj napomenu"}
                                               >
-                                                <MessageSquare className="w-4 h-4" />
+                                                <MessageSquare className={isAndroid ? "w-6 h-6" : "w-4 h-4"} />
                                               </button>
                                             </div>
                                           </td>
@@ -1983,10 +1997,22 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                           {stavka.kolicina}
                                         </td>
                                         <td
-                                          className="px-4 py-3 align-top"
+                                          className={`${isAndroid ? "pl-4 pr-2" : "px-4"} py-3 align-top`}
                                           onClick={(e) => e.stopPropagation()}
                                         >
                                           <div className="flex items-center gap-1">
+                                              {isAndroid && saveStatus[stavka.key] === "saving" && (
+                                                <Loader className="w-3 h-3 animate-spin text-gray-400" />
+                                              )}
+                                              {isAndroid && saveStatus[stavka.key] === "ok" && (
+                                                <CheckCircle2
+                                                  className="w-3 h-3"
+                                                  style={{ color: SECONDARY }}
+                                                />
+                                              )}
+                                              {isAndroid && saveStatus[stavka.key] === "error" && (
+                                                <XCircle className="w-3 h-3 text-red-500" />
+                                              )}
                                               <input
                                                 ref={(el) =>
                                                   inputRefs.current.set(
@@ -2007,7 +2033,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                   )
                                                 }
                                                 placeholder="-1.000"
-                                                className="w-24 text-right text-sm font-bold border-2 rounded-lg px-2 py-2 focus:outline-none transition"
+                                                className={`w-24 text-right text-sm font-bold border-2 rounded-lg px-2 py-2 focus:outline-none transition${isAndroid ? " ml-auto" : ""}`}
                                                 style={{
                                                   borderColor:
                                                     saveStatus[stavka.key] ===
@@ -2073,6 +2099,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                   );
                                                 }}
                                               />
+                                              {!isAndroid && (
                                               <button
                                                 type="button"
                                                 onClick={() => {
@@ -2098,18 +2125,19 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                   className={`w-4 h-4 ${isListening ? "animate-pulse" : ""}`}
                                                 />
                                               </button>
-                                              {saveStatus[stavka.key] ===
+                                              )}
+                                              {!isAndroid && saveStatus[stavka.key] ===
                                                 "saving" && (
                                                 <Loader className="w-3 h-3 animate-spin text-gray-400" />
                                               )}
-                                              {saveStatus[stavka.key] ===
+                                              {!isAndroid && saveStatus[stavka.key] ===
                                                 "ok" && (
                                                 <CheckCircle2
                                                   className="w-3 h-3"
                                                   style={{ color: SECONDARY }}
                                                 />
                                               )}
-                                              {saveStatus[stavka.key] ===
+                                              {!isAndroid && saveStatus[stavka.key] ===
                                                 "error" && (
                                                 <XCircle className="w-3 h-3 text-red-500" />
                                               )}
@@ -2125,7 +2153,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                   });
                                                 }}
                                                 disabled={jeVerifikovan}
-                                                className="p-1.5 rounded-lg transition-all"
+                                                className={`${isAndroid ? "p-1" : "p-1.5"} rounded-lg transition-all`}
                                                 style={{
                                                   backgroundColor: napomenaOp[stavka.key] ? `${SECONDARY}22` : `${PRIMARY}10`,
                                                   color: jeVerifikovan ? "rgb(156 163 175)" : napomenaOp[stavka.key] ? SECONDARY : PRIMARY,
@@ -2134,7 +2162,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                 }}
                                                 title={jeVerifikovan ? "Verificirano — izmjena nije moguća" : napomenaOp[stavka.key] ? `Napomena: ${napomenaOp[stavka.key]}` : "Dodaj napomenu"}
                                               >
-                                                <MessageSquare className="w-4 h-4" />
+                                                <MessageSquare className={isAndroid ? "w-6 h-6" : "w-4 h-4"} />
                                               </button>
                                           </div>
                                         </td>
