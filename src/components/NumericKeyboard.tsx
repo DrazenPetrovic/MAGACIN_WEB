@@ -68,7 +68,12 @@ export function NumericKeyboard({ value, label, onChange, onConfirm, onClose }: 
   const isPreview  = hasPlusOp && !expr.endsWith("+");
   const preview    = isPreview ? `= ${evaluate()}` : "";
   const displayVal = expr || "";
-  const fontSize   = displayVal.length > 10 ? "1.4rem" : displayVal.length > 6 ? "1.8rem" : "2.4rem";
+  const fontSize   =
+    displayVal.length > 24 ? "1.1rem" :
+    displayVal.length > 18 ? "1.3rem" :
+    displayVal.length > 14 ? "1.6rem" :
+    displayVal.length > 10 ? "1.8rem" :
+    displayVal.length > 6  ? "2rem"   : "2.4rem";
 
   // ─── Boje ─────────────────────────────────────────────────────────────────
   type BtnKind = "num" | "back" | "minusone" | "ok" | "plus" | "eq";
@@ -143,8 +148,13 @@ export function NumericKeyboard({ value, label, onChange, onConfirm, onClose }: 
         >
           {/* Izraz */}
           <div
-            className="font-bold leading-none text-right"
-            style={{ fontSize, color: displayVal ? PRIMARY : "rgb(209 213 219)" }}
+            className="font-bold leading-tight text-right"
+            style={{
+              fontSize,
+              color: displayVal ? PRIMARY : "rgb(209 213 219)",
+              wordBreak: "break-all",
+              whiteSpace: "normal",
+            }}
           >
             {displayVal || "0"}
           </div>

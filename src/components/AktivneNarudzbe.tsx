@@ -551,7 +551,8 @@ export function AktivneNarudzbe({ onBack }: Props) {
   };
 
   const handleSpremljenoChange = (key: string, raw: string) => {
-    const clean = raw.replace(",", ".").replace(/[^0-9.]/g, "");
+    const stripped = raw.replace(",", ".").replace(/[^0-9.-]/g, "");
+    const clean = stripped ? stripped[0] + stripped.slice(1).replace(/-/g, "") : "";
     setSpremljeno((p) => ({ ...p, [key]: clean }));
   };
 
