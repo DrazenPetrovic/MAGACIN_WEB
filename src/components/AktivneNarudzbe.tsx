@@ -179,6 +179,9 @@ export function AktivneNarudzbe({ onBack }: Props) {
     sifraTabele?: number;
     label: string;
   } | null>(null);
+  // Vrijeme zatvaranja numeričke tastature — sprječava "duh-klik" koji nakon
+  // zatvaranja tastature pogodi red ispod prsta i otvori tastaturu za drugi proizvod.
+  const kbClosedAtRef = useRef(0);
   const inputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map());
   const cardRefs = useRef(new Map<string, HTMLDivElement>());
   const overlayRefs = useRef(new Map<string, HTMLDivElement>());
@@ -624,6 +627,10 @@ export function AktivneNarudzbe({ onBack }: Props) {
     if (!val || val === "-1.000" || !sifraTabele) return;
     const kolicina = parseFloat(val.replace(",", "."));
     if (isNaN(kolicina)) return;
+    if (kolicina === -1) {
+      await handleSpremljenoReset(key, sifraTabele);
+      return;
+    }
     setSaveStatus((p) => ({ ...p, [key]: "saving" }));
     try {
       const res = await apiFetch(
@@ -1563,6 +1570,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                           }
                                           onClick={() => {
                                             if (jeVerifikovan) return;
+                                            if (isAndroid && Date.now() - kbClosedAtRef.current < 350) return;
                                             const hasVal =
                                               spremljeno[key] &&
                                               spremljeno[key] !== "-1.000";
@@ -1691,6 +1699,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                   onClick={() => {
                                                     if (!isAndroid) return;
                                                     if (jeVerifikovan) return;
+                                                    if (Date.now() - kbClosedAtRef.current < 350) return;
                                                     if (spremljeno[key] && spremljeno[key] !== "-1.000") {
                                                       setConfirmKey(key);
                                                     } else {
@@ -1961,6 +1970,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                         }
                                         onClick={() => {
                                           if (jeVerifikovan) return;
+                                          if (isAndroid && Date.now() - kbClosedAtRef.current < 350) return;
                                           const hasVal =
                                             spremljeno[stavka.key] &&
                                             spremljeno[stavka.key] !== "-1.000";
@@ -2075,6 +2085,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                 onClick={() => {
                                                   if (!isAndroid) return;
                                                   if (jeVerifikovan) return;
+                                                  if (Date.now() - kbClosedAtRef.current < 350) return;
                                                   if (spremljeno[stavka.key] && spremljeno[stavka.key] !== "-1.000") {
                                                     setConfirmKey(stavka.key);
                                                   } else {
@@ -2364,13 +2375,15 @@ export function AktivneNarudzbe({ onBack }: Props) {
           onConfirm={(val) => {
             const { key, sifraTabele } = numKbState;
             setNumKbState(null);
-            if (val === "-1.000" && saveStatus[key] === "ok") {
-              handleSpremljenoReset(key, sifraTabele);
-            } else if (val !== "-1.000") {
+            kbClosedAtRef.current = Date.now();
+            if (val !== "-1.000") {
               handleSpremljenoBlur(key, sifraTabele, napomenaOp[key], val);
             }
           }}
-          onClose={() => setNumKbState(null)}
+          onClose={() => {
+            setNumKbState(null);
+            kbClosedAtRef.current = Date.now();
+          }}
         />
       )}
 
