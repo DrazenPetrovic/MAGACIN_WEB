@@ -16,6 +16,7 @@ import {
   Package,
   GripVertical,
   Check,
+  Lock,
 } from "lucide-react";
 import { KalkulatorModal } from "./KalkulatorModal";
 import { NumericKeyboard } from "./NumericKeyboard";
@@ -297,6 +298,45 @@ export function AktivneNarudzbe({ onBack }: Props) {
     });
     setVerifikovaniKupci(newSet);
   }, [verifikovaniProizvodi, narudzbePoKupcu]);
+
+  // Zaključavanje kupca — dostupno tek kad su mu svi proizvodi verifikovani (verifikovano=1).
+  // Šalje istu verifikacionu proceduru, ali sa verifikovano=2, samo za stavke ovog kupca.
+  const handleZakljucajKupca = async (kupac: NarudzbaKupac) => {
+    const kupacKey = getKupacGroupingKey(kupac.sifra_kupca, kupac.referentni_broj);
+    const sifraTabeleArray = kupac.proizvodi
+      .map((p) => p.sifra_tabele)
+      .filter((s): s is number => s != null);
+    if (sifraTabeleArray.length === 0) return;
+
+    setNarudzbePoKupcu((prev) =>
+      prev.map((k) =>
+        getKupacGroupingKey(k.sifra_kupca, k.referentni_broj) === kupacKey
+          ? { ...k, proizvodi: k.proizvodi.map((p) => ({ ...p, verifikovano: 2 })) }
+          : k,
+      ),
+    );
+
+    try {
+      const res = await apiFetch(`${API_URL}/api/aktivne-narudzbe-teren/verifikacija`, {
+        method: "POST",
+        body: JSON.stringify({ sifraTabeleArray, verifikovano: 2 }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.message || data.poruka || "Greška pri zaključavanju");
+      }
+    } catch (err) {
+      setNarudzbePoKupcu((prev) =>
+        prev.map((k) =>
+          getKupacGroupingKey(k.sifra_kupca, k.referentni_broj) === kupacKey
+            ? { ...k, proizvodi: k.proizvodi.map((p) => ({ ...p, verifikovano: 1 })) }
+            : k,
+        ),
+      );
+      setVerifikacijaGreska(err instanceof Error ? err.message : "Greška pri zaključavanju");
+      setTimeout(() => setVerifikacijaGreska(null), 4000);
+    }
+  };
 
   const handleDragStart = useCallback((
     e: React.TouchEvent | React.MouseEvent,
@@ -1362,6 +1402,10 @@ export function AktivneNarudzbe({ onBack }: Props) {
                             const k = rowKey(kupacKey, p.sif, idx);
                             return saveStatus[k] === "ok";
                           });
+                        const sviProizvodiVerifikovani = verifikovaniKupci.has(kupacKey);
+                        const sviProizvodiZakljucani =
+                          kupac.proizvodi.length > 0 &&
+                          kupac.proizvodi.every((p) => p.verifikovano === 2);
                         const isDragging = draggingKey === kupacKey;
                         const isOver = dragOverKey === kupacKey && !!draggingKey;
                         const dropLine = (
@@ -1397,16 +1441,21 @@ export function AktivneNarudzbe({ onBack }: Props) {
                             <div
                               className="bg-white rounded-xl overflow-hidden relative select-none"
                               style={{
-                                border: verifikovaniKupci.has(kupacKey)
-                                  ? "3px solid #ef4444"
-                                  : allFilled
-                                    ? `2px solid ${SECONDARY}`
-                                    : "2px solid rgb(229 231 235)",
-                                boxShadow: verifikovaniKupci.has(kupacKey)
-                                  ? "0 0 0 3px #ef4444"
-                                  : allFilled
-                                    ? `0 0 0 3px ${SECONDARY}`
-                                    : undefined,
+                                border: sviProizvodiZakljucani
+                                  ? "3px solid rgb(156 163 175)"
+                                  : sviProizvodiVerifikovani
+                                    ? "3px solid #ef4444"
+                                    : allFilled
+                                      ? `2px solid ${SECONDARY}`
+                                      : "2px solid rgb(229 231 235)",
+                                boxShadow: sviProizvodiZakljucani
+                                  ? "0 0 0 3px rgb(156 163 175)"
+                                  : sviProizvodiVerifikovani
+                                    ? "0 0 0 3px #ef4444"
+                                    : allFilled
+                                      ? `0 0 0 3px ${SECONDARY}`
+                                      : undefined,
+                                opacity: sviProizvodiZakljucani ? 0.85 : 1,
                               }}
                             >
                             {/* ─── Zaglavlje kupca ─── */}
@@ -1481,6 +1530,29 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                     {kupac.proizvodi.length}
                                   </span>
                                 </div>
+                                {sviProizvodiZakljucani ? (
+                                  <div
+                                    className="flex items-center gap-1 px-3 py-2 rounded-lg flex-none"
+                                    style={{ background: "rgb(229 231 235)", color: "rgb(107 114 128)" }}
+                                  >
+                                    <Lock className="w-4 h-4" />
+                                    <span className="text-xs font-bold uppercase">Zaključano</span>
+                                  </div>
+                                ) : sviProizvodiVerifikovani ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleZakljucajKupca(kupac);
+                                    }}
+                                    className="flex items-center gap-1 px-3 py-2 rounded-lg flex-none transition-transform active:scale-95"
+                                    style={{ background: "#ef4444", color: "white" }}
+                                    title="Zaključaj kupca — onemogući dalje izmjene"
+                                  >
+                                    <Lock className="w-4 h-4" />
+                                    <span className="text-xs font-bold uppercase">Zaključaj</span>
+                                  </button>
+                                ) : null}
                                 <ChevronDown
                                   className="w-5 h-5 flex-none transition-transform duration-200"
                                   style={{
@@ -1551,23 +1623,26 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                     kupac.proizvodi.map((proizvod, index) => {
                                       const key = rowKey(kupacKey, proizvod.sif, index);
                                       const isListening = voiceKey === key;
-                                      const jeVerifikovan = verifikovaniProizvodi.has(String(proizvod.sif)) || proizvod.verifikovano === 1;
+                                      const verNivo =
+                                        proizvod.verifikovano === 2
+                                          ? 2
+                                          : verifikovaniProizvodi.has(String(proizvod.sif)) || proizvod.verifikovano === 1
+                                            ? 1
+                                            : 0;
+                                      const jeVerifikovan = verNivo >= 1;
+                                      const jeZakljucan = verNivo === 2;
                                       return (
                                         <tr
                                           key={key}
-                                          className="transition-colors cursor-pointer"
-                                          style={
-                                            saveStatus[key] === "error"
-                                              ? {
-                                                  backgroundColor:
-                                                    "rgb(254 242 242)",
-                                                }
+                                          className={`transition-colors ${jeZakljucan ? "cursor-not-allowed" : "cursor-pointer"}`}
+                                          style={{
+                                            ...(saveStatus[key] === "error"
+                                              ? { backgroundColor: "rgb(254 242 242)" }
                                               : saveStatus[key] === "ok"
-                                                ? {
-                                                    backgroundColor: `${SECONDARY}22`,
-                                                  }
-                                                : undefined
-                                          }
+                                                ? { backgroundColor: `${SECONDARY}22` }
+                                                : {}),
+                                            opacity: jeZakljucan ? 0.55 : 1,
+                                          }}
                                           onClick={() => {
                                             if (jeVerifikovan) return;
                                             if (isAndroid && Date.now() - kbClosedAtRef.current < 350) return;
@@ -1585,6 +1660,22 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                             <div>
                                               {proizvod.naziv_proizvoda}
                                               <span className="text-xs font-bold ml-1" style={{ color: PRIMARY }}>({proizvod.jm})</span>
+                                              {verNivo === 1 && (
+                                                <span
+                                                  className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase"
+                                                  style={{ background: "#ef444422", color: "#ef4444" }}
+                                                >
+                                                  Verifikovano
+                                                </span>
+                                              )}
+                                              {verNivo === 2 && (
+                                                <span
+                                                  className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase inline-flex items-center gap-1"
+                                                  style={{ background: "rgb(229 231 235)", color: "rgb(107 114 128)" }}
+                                                >
+                                                  <Lock className="w-3 h-3" /> Zaključano
+                                                </span>
+                                              )}
                                             </div>
                                             {proizvod.napomena &&
                                               proizvod.napomena.trim() &&
@@ -1636,7 +1727,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                 {isAndroid && saveStatus[key] === "ok" && (
                                                   <CheckCircle2
                                                     className="w-3 h-3"
-                                                    style={{ color: (verifikovaniProizvodi.has(String(proizvod.sif)) || proizvod.verifikovano === 1) ? "#ef4444" : SECONDARY }}
+                                                    style={{ color: jeZakljucan ? "rgb(156 163 175)" : verNivo === 1 ? "#ef4444" : SECONDARY }}
                                                   />
                                                 )}
                                                 {isAndroid && saveStatus[key] === "error" && (
@@ -1745,7 +1836,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                         : PRIMARY,
                                                     opacity: jeVerifikovan ? 0.4 : 1,
                                                   }}
-                                                  title={jeVerifikovan ? "Verificirano — izmjena nije moguća" : "Glasovni unos"}
+                                                  title={jeZakljucan ? "Zaključano — izmjena nije moguća" : jeVerifikovan ? "Verificirano — izmjena nije moguća" : "Glasovni unos"}
                                                 >
                                                   <Mic
                                                     className={`w-4 h-4 ${isListening ? "animate-pulse" : ""}`}
@@ -1759,7 +1850,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                 {!isAndroid && saveStatus[key] === "ok" && (
                                                   <CheckCircle2
                                                     className="w-3 h-3"
-                                                    style={{ color: (verifikovaniProizvodi.has(String(proizvod.sif)) || proizvod.verifikovano === 1) ? "#ef4444" : SECONDARY }}
+                                                    style={{ color: jeZakljucan ? "rgb(156 163 175)" : verNivo === 1 ? "#ef4444" : SECONDARY }}
                                                   />
                                                 )}
                                                 {!isAndroid && saveStatus[key] ===
@@ -1785,7 +1876,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                   opacity: jeVerifikovan ? 0.4 : 1,
                                                   cursor: jeVerifikovan ? "default" : "pointer",
                                                 }}
-                                                title={jeVerifikovan ? "Verificirano — izmjena nije moguća" : napomenaOp[key] ? `Napomena: ${napomenaOp[key]}` : "Dodaj napomenu"}
+                                                title={jeZakljucan ? "Zaključano — izmjena nije moguća" : jeVerifikovan ? "Verificirano — izmjena nije moguća" : napomenaOp[key] ? `Napomena: ${napomenaOp[key]}` : "Dodaj napomenu"}
                                               >
                                                 <MessageSquare className={isAndroid ? "w-6 h-6" : "w-4 h-4"} />
                                               </button>

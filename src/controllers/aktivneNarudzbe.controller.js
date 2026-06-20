@@ -98,7 +98,8 @@ export const getTerenPoDanima = async (req, res) => {
 };
 
 // POST /api/aktivne-narudzbe-teren/verifikacija
-// Prima: { sifraTabeleArray: number[], verifikovano: 0|1 }
+// Prima: { sifraTabeleArray: number[], verifikovano: 0|1|2 }
+// 0 = poništi verifikaciju, 1 = verifikovano, 2 = zaključano (kupac zaključan, dalje izmjene nisu moguće)
 // Validacija kompletnosti grupe je na frontendu — ovdje samo zapisujemo.
 export const verifikujGrupu = async (req, res) => {
   try {
@@ -106,9 +107,13 @@ export const verifikujGrupu = async (req, res) => {
     if (!Array.isArray(sifraTabeleArray) || sifraTabeleArray.length === 0) {
       return res.status(400).json({ success: false, message: 'sifraTabeleArray je obavezan i ne smije biti prazan' });
     }
+    const verifikovanoNum = verifikovano !== undefined ? Number(verifikovano) : 1;
+    if (![0, 1, 2].includes(verifikovanoNum)) {
+      return res.status(400).json({ success: false, message: 'verifikovano mora biti 0, 1 ili 2' });
+    }
     const result = await AktivneNarudzbeService.verifikujGrupu(
       sifraTabeleArray.map(Number),
-      verifikovano !== undefined ? Number(verifikovano) : 1,
+      verifikovanoNum,
     );
     if (result.success) {
       return res.json(result);

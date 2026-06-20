@@ -14,7 +14,8 @@
       "Read(//home/korisnik/MAGACIN_WEB/node_modules/**)",
       "Bash(cd /home/korisnik/MAGACIN_WEB && npm install @capacitor-community/speech-recognition 2>&1 | tail -5)",
       "Read(//home/korisnik/**)",
-      "Bash(wsl ls *)"
+      "Bash(wsl ls *)",
+      "Bash(echo \"exit:$?\")"
     ],
     "additionalDirectories": [
       "d:\\WEB_KOMERCIJALA\\MAGACIN_WEB\\public\\foto"

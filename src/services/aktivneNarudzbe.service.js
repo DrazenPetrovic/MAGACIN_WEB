@@ -96,7 +96,8 @@ export const getArhiviraneNarudzbeGrupisano = async () => {
 };
 
 // POST /api/aktivne-narudzbe-teren/verifikacija
-// Vrši verifikaciju grupe stavki (svi isti kupac ili svi isti proizvod).
+// Vrši verifikaciju (ili zaključavanje) grupe stavki (svi isti kupac ili svi isti proizvod).
+// verifikovano: 0 = poništi, 1 = verifikovano, 2 = zaključano.
 // Sve stavke moraju biti popunjene (provjera je na frontendu),
 // a sve se ažuriraju u jednoj transakciji — ili sve ili ništa.
 export const verifikujGrupu = async (sifraTabeleArray, verifikovano = 1) => {
@@ -124,7 +125,12 @@ export const verifikujGrupu = async (sifraTabeleArray, verifikovano = 1) => {
       await connection.commit();
       return {
         success: true,
-        poruka: verifikovano === 1 ? 'Verifikacija uspješna' : 'Verifikacija poništena',
+        poruka:
+          verifikovano === 2
+            ? 'Kupac zaključan'
+            : verifikovano === 1
+              ? 'Verifikacija uspješna'
+              : 'Verifikacija poništena',
         results,
       };
     } catch (err) {
