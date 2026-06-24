@@ -1004,7 +1004,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
     return ordered;
   })();
 
-  // ─── Brojač spremljenih ────────────────────────────────────────────────────
+  // ─── Brojači ──────────────────────────────────────────────────────────────
   const totalProizvoda = narudzbePoKupcu.reduce(
     (s, k) => s + k.proizvodi.length,
     0,
@@ -1020,6 +1020,18 @@ export function AktivneNarudzbe({ onBack }: Props) {
         );
         return saveStatus[k] === "ok";
       }).length,
+    0,
+  );
+  const verifikovanoCount = narudzbePoKupcu.reduce(
+    (s, kupac) => s + kupac.proizvodi.filter((p) => (p.verifikovano ?? 0) >= 1).length,
+    0,
+  );
+  const totalKupaca = narudzbePoKupcu.length;
+  const zakljucanoKupciCount = narudzbePoKupcu.filter(
+    (k) => k.proizvodi.length > 0 && k.proizvodi.every((p) => p.verifikovano === 2),
+  ).length;
+  const zakljucanoProizvodaCount = narudzbePoKupcu.reduce(
+    (s, k) => s + k.proizvodi.filter((p) => p.verifikovano === 2).length,
     0,
   );
 
@@ -1175,16 +1187,18 @@ export function AktivneNarudzbe({ onBack }: Props) {
                 <div className="relative">
                   <button
                     onClick={() => setDayDropdownOpen((o) => !o)}
-                    className="flex items-center gap-2 rounded-lg px-2 py-1 transition-all hover:bg-gray-100 active:bg-gray-200"
+                    className="flex items-center gap-1.5 rounded-lg px-2 py-1 transition-all hover:bg-gray-100 active:bg-gray-200"
                   >
-                    <span className="text-base md:text-lg font-bold" style={{ color: PRIMARY }}>
-                      {nazivDana || "Aktivne narudžbe"}
-                    </span>
-                    {datumDostave && (
-                      <span className="text-sm font-normal text-gray-500">{datumDostave}</span>
-                    )}
+                    <div className="flex flex-col items-start">
+                      <span className="text-base md:text-lg font-bold leading-tight" style={{ color: PRIMARY }}>
+                        {nazivDana || "Aktivne narudžbe"}
+                      </span>
+                      {datumDostave && (
+                        <span className="text-xs font-normal text-gray-500 leading-tight">{datumDostave}</span>
+                      )}
+                    </div>
                     <ChevronDown
-                      className="w-4 h-4 transition-transform"
+                      className="w-4 h-4 transition-transform flex-none"
                       style={{ color: PRIMARY, transform: dayDropdownOpen ? "rotate(180deg)" : "rotate(0deg)" }}
                     />
                   </button>
@@ -1311,21 +1325,40 @@ export function AktivneNarudzbe({ onBack }: Props) {
                         top: '50%',
                         left: '50%',
                         animation: 'spinBorder 2s linear infinite',
-                        background: spremljenoCount === totalProizvoda
+                        background: zakljucanoKupciCount === totalKupaca && totalKupaca > 0
                           ? `conic-gradient(${SECONDARY}, #c5e87b, ${SECONDARY}88, #c5e87b, ${SECONDARY})`
                           : `conic-gradient(${PRIMARY}, #b8a8d4, ${PRIMARY}88, #b8a8d4, ${PRIMARY})`,
                       }}
                     />
                     <button
                       onClick={() => { if (selectedDay !== null) fetchAktivneNarudzbeZaTeren(selectedDay); }}
-                      className="relative flex items-center gap-2 px-4 py-2 rounded-[10px] font-semibold text-sm active:scale-95 transition-transform"
+                      className="relative px-3 py-1.5 rounded-[10px] active:scale-95 transition-transform"
                       style={{
-                        background: spremljenoCount === totalProizvoda ? `${SECONDARY}22` : 'white',
+                        background: zakljucanoKupciCount === totalKupaca && totalKupaca > 0 ? `${SECONDARY}22` : 'white',
                         color: PRIMARY,
                       }}
                       title="Klikni za osvježavanje narudžbi"
                     >
-                      Spremljeno: {spremljenoCount}/{totalProizvoda}
+                      {/* Gornji red — ikone */}
+                      <div className="flex gap-3 items-center justify-between">
+                        <Package className="w-3 h-3" style={{ color: PRIMARY }} title="Spremljeno" />
+                        <CheckCircle2 className="w-3 h-3" style={{ color: PRIMARY }} title="Verifikovano" />
+                        <Lock className="w-3 h-3" style={{ color: PRIMARY }} title="Zakljucano" />
+                      </div>
+                      {/* Linija */}
+                      <div className="my-1" style={{ borderTop: `1px solid ${PRIMARY}33` }} />
+                      {/* Donji red — brojevi */}
+                      <div className="flex gap-3 items-center justify-between">
+                        <span className="text-xs font-bold tabular-nums" style={{ color: PRIMARY }}>
+                          {spremljenoCount}/{totalProizvoda}
+                        </span>
+                        <span className="text-xs font-bold tabular-nums" style={{ color: PRIMARY }}>
+                          {verifikovanoCount}/{totalProizvoda}
+                        </span>
+                        <span className="text-xs font-bold tabular-nums" style={{ color: PRIMARY }}>
+                          {zakljucanoProizvodaCount}/{totalProizvoda}
+                        </span>
+                      </div>
                     </button>
                   </div>
                 )}
@@ -1553,11 +1586,10 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                 </div>
                                 {sviProizvodiZakljucani ? (
                                   <div
-                                    className="flex items-center gap-1 px-3 py-2 rounded-lg flex-none"
+                                    className="flex items-center justify-center w-8 h-8 rounded-lg flex-none"
                                     style={{ background: "rgb(229 231 235)", color: "rgb(107 114 128)" }}
                                   >
                                     <Lock className="w-4 h-4" />
-                                    <span className="text-xs font-bold uppercase">Zaključano</span>
                                   </div>
                                 ) : sviProizvodiVerifikovani ? (
                                   <button
@@ -1691,10 +1723,10 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                               )}
                                               {verNivo === 2 && (
                                                 <span
-                                                  className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase inline-flex items-center gap-1"
+                                                  className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded"
                                                   style={{ background: "rgb(229 231 235)", color: "rgb(107 114 128)" }}
                                                 >
-                                                  <Lock className="w-3 h-3" /> Zaključano
+                                                  <Lock className="w-2.5 h-2.5" />
                                                 </span>
                                               )}
                                             </div>
@@ -2463,15 +2495,6 @@ export function AktivneNarudzbe({ onBack }: Props) {
         </div>
       )}
 
-      {/* ─── FAB: Kalkulator ────────────────────────────────────────────────── */}
-      <button
-        onClick={() => setKalkulatorOpen(true)}
-        className="fixed bottom-20 right-5 z-40 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform"
-        style={{ backgroundColor: PRIMARY }}
-        title="Otvori kalkulator"
-      >
-        <Calculator className="w-6 h-6 text-white" />
-      </button>
 
       {numKbState && (
         <NumericKeyboard
