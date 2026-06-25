@@ -29,6 +29,18 @@ function App() {
   const [screen, setScreen] = useState<Screen>("dashboard");
   const [pendingLocalOrders, setPendingLocalOrders] = useState(0);
   const [toast, setToast] = useState<{ text: string; ts: number } | null>(null);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const onOffline = () => setIsOffline(true);
+    const onOnline = () => setIsOffline(false);
+    window.addEventListener("offline", onOffline);
+    window.addEventListener("online", onOnline);
+    return () => {
+      window.removeEventListener("offline", onOffline);
+      window.removeEventListener("online", onOnline);
+    };
+  }, []);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -196,6 +208,40 @@ function App() {
   return (
     <>
       {content}
+      {isOffline && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: "rgba(0,0,0,0.75)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "24px",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: "16px",
+              padding: "36px 28px",
+              maxWidth: "340px",
+              width: "100%",
+              textAlign: "center",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+            }}
+          >
+            <div style={{ fontSize: "48px", marginBottom: "16px" }}>📡</div>
+            <p style={{ fontSize: "20px", fontWeight: 700, color: "#1e293b", marginBottom: "8px" }}>
+              Izgubljena veza
+            </p>
+            <p style={{ fontSize: "14px", color: "#64748b", lineHeight: 1.5 }}>
+              Provjerite WiFi ili mobilnu mrežu. Aplikacija će se automatski nastaviti kada se veza uspostavi.
+            </p>
+          </div>
+        </div>
+      )}
       {toast && (
         <div
           className="fixed right-4 top-4 z-[60] max-w-sm rounded-xl border px-4 py-3 shadow-xl backdrop-blur animate-[fadeIn_180ms_ease-out]"

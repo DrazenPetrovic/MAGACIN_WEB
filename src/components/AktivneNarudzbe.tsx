@@ -325,14 +325,6 @@ export function AktivneNarudzbe({ onBack }: Props) {
       if (!data.success) {
         throw new Error(data.message || data.poruka || "Greška pri zaključavanju");
       }
-      // Persist zakljucanog kupca — SP pri ponovnom ucitavanju moze vratiti verifikovano=1
-      try {
-        const lockKey = `zakljucaniKupci_${selectedDay}`;
-        const existing: string[] = JSON.parse(localStorage.getItem(lockKey) || '[]');
-        if (!existing.includes(kupacKey)) {
-          localStorage.setItem(lockKey, JSON.stringify([...existing, kupacKey]));
-        }
-      } catch { /* ignore */ }
     } catch (err) {
       setNarudzbePoKupcu((prev) =>
         prev.map((k) =>
@@ -845,17 +837,6 @@ export function AktivneNarudzbe({ onBack }: Props) {
 
         const finalList = Array.from(kupciMap.values());
 
-        // Vrati zakljucane kupce iz localStorage (SP moze ne vracati verifikovano=2)
-        try {
-          const lockKey = `zakljucaniKupci_${sifraTerenaDostava}`;
-          const savedLocked: string[] = JSON.parse(localStorage.getItem(lockKey) || '[]');
-          finalList.forEach((kupac) => {
-            const kKey = getKupacGroupingKey(kupac.sifra_kupca, kupac.referentni_broj);
-            if (savedLocked.includes(kKey)) {
-              kupac.proizvodi = kupac.proizvodi.map((p) => ({ ...p, verifikovano: 2 }));
-            }
-          });
-        } catch { /* ignore */ }
 
         const initialSpremljeno: Record<string, string> = {};
         const initialSaveStatus: Record<string, "saving" | "ok" | "error"> = {};
