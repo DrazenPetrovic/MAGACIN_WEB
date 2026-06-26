@@ -1153,7 +1153,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
         <div className="bg-white rounded-none md:rounded-2xl shadow-xl overflow-hidden flex flex-col h-full">
           {/* ─── HEADER — KOLAPSIBILAN (identično KOMERCIJALA) ──────────────── */}
           <div className="border-b-2 border-gray-200 bg-white flex-none">
-            <div className="grid grid-cols-3 items-center pl-2 pr-4 md:px-8 py-2 md:py-4">
+            <div className="flex items-center gap-2 pl-2 pr-4 md:px-8 py-2 md:py-4">
               {/* ── LIJEVO: nazad + dan ── */}
               <div className="flex items-center gap-3">
                 <button
@@ -1280,7 +1280,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
               </div>
 
               {/* ── DESNO: search + Spremljeno ── */}
-              <div className="flex items-center justify-end gap-1.5">
+              <div className="flex items-center justify-end gap-1.5 ml-auto">
                 <button
                   onClick={() => { setSearchModalOpen(true); setTimeout(startSearchVoice, 300); }}
                   className="p-2 rounded-lg transition-all relative"
@@ -1477,20 +1477,22 @@ export function AktivneNarudzbe({ onBack }: Props) {
                               className="bg-white rounded-xl overflow-hidden relative select-none"
                               style={{
                                 border: sviProizvodiZakljucani
-                                  ? "3px solid rgb(156 163 175)"
+                                  ? "2px solid rgb(209 213 219)"
                                   : sviProizvodiVerifikovani
                                     ? "3px solid #ef4444"
                                     : allFilled
                                       ? `2px solid ${SECONDARY}`
                                       : "2px solid rgb(229 231 235)",
                                 boxShadow: sviProizvodiZakljucani
-                                  ? "0 0 0 3px rgb(156 163 175)"
+                                  ? "none"
                                   : sviProizvodiVerifikovani
                                     ? "0 0 0 3px #ef4444"
                                     : allFilled
                                       ? `0 0 0 3px ${SECONDARY}`
                                       : undefined,
-                                opacity: sviProizvodiZakljucani ? 0.85 : 1,
+                                opacity: sviProizvodiZakljucani ? 0.55 : 1,
+                                filter: sviProizvodiZakljucani ? "grayscale(1)" : undefined,
+                                pointerEvents: sviProizvodiZakljucani ? "none" : undefined,
                               }}
                             >
                             {/* ─── Zaglavlje kupca ─── */}
