@@ -12,6 +12,9 @@ router.post('/reset', AktivneNarudzbeController.resetProizvod);
 // Verifikacija grupe stavki (svi isti kupac ili svi isti proizvod)
 router.post('/verifikacija', AktivneNarudzbeController.verifikujGrupu);
 
+// Zamjena proizvoda na stavci narudžbe (magacioner)
+router.post('/zamjena-proizvoda', AktivneNarudzbeController.zamijeniProizvod);
+
 // Dohvati sve terene po danima (frontend bira današnji)
 router.get('/tereni', AktivneNarudzbeController.getTerenPoDanima);
 

@@ -97,6 +97,55 @@ export const getTerenPoDanima = async (req, res) => {
   }
 };
 
+// POST /api/aktivne-narudzbe-teren/zamjena-proizvoda
+// Zamjena proizvoda na stavci narudžbe koju vrši magacioner (npr. traženog artikla nema na stanju).
+// Šalje se JSON procedurom sp_dostava_proizvoda_izmjene_magacin — upisuje stari i novi proizvod.
+export const zamijeniProizvod = async (req, res) => {
+  try {
+    const {
+      sifraTabeleOriginal,
+      sifraTerenaDostava,
+      sifraPartnera,
+      sifraProizvodaStaro,
+      nazivProizvodaStaro,
+      jmStaro,
+      sifraProizvodaNovo,
+      nazivProizvodaNovo,
+      jmNovo,
+    } = req.body;
+
+    if (
+      !sifraTabeleOriginal ||
+      !sifraTerenaDostava ||
+      !sifraPartnera ||
+      sifraProizvodaStaro === undefined ||
+      sifraProizvodaNovo === undefined
+    ) {
+      return res.status(400).json({ success: false, message: 'Nedostaju obavezni podaci za zamjenu proizvoda' });
+    }
+
+    const result = await AktivneNarudzbeService.zamijeniProizvod({
+      sifra_tabele_original: Number(sifraTabeleOriginal),
+      sifra_terena_dostava: Number(sifraTerenaDostava),
+      sifra_partnera: Number(sifraPartnera),
+      sifra_proizvoda_staro: sifraProizvodaStaro,
+      naziv_proizvoda_staro: nazivProizvodaStaro,
+      jm_staro: jmStaro,
+      sifra_proizvoda_novo: sifraProizvodaNovo,
+      naziv_proizvoda_novo: nazivProizvodaNovo,
+      jm_novo: jmNovo,
+    });
+
+    if (result && Number(result.success) === 1) {
+      return res.json({ success: true, data: result });
+    }
+    return res.status(400).json({ success: false, message: result?.poruka || 'Zamjena proizvoda nije uspjela' });
+  } catch (error) {
+    console.error('zamijeniProizvod error:', error);
+    return res.status(500).json({ success: false, message: 'Greška pri zamjeni proizvoda' });
+  }
+};
+
 // POST /api/aktivne-narudzbe-teren/verifikacija
 // Prima: { sifraTabeleArray: number[], verifikovano: 0|1|2 }
 // 0 = poništi verifikaciju, 1 = verifikovano, 2 = zaključano (kupac zaključan, dalje izmjene nisu moguće)

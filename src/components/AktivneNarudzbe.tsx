@@ -17,9 +17,11 @@ import {
   GripVertical,
   Check,
   Lock,
+  Pencil,
 } from "lucide-react";
 import { KalkulatorModal } from "./KalkulatorModal";
 import { NumericKeyboard } from "./NumericKeyboard";
+import { ZamjenaProizvodaModal, type ArtikalOption, type ArtikalGrupa } from "./ZamjenaProizvodaModal";
 import { theme } from "../theme";
 import { apiFetch } from "../utils/apiFetch";
 import { Capacitor } from "@capacitor/core";
@@ -168,6 +170,21 @@ export function AktivneNarudzbe({ onBack }: Props) {
   const [verifikovaniKupci, setVerifikovaniKupci] = useState<Set<string>>(new Set());
   const [verifikovaniProizvodi, setVerifikovaniProizvodi] = useState<Set<string>>(new Set());
   const [verifikacijaGreska, setVerifikacijaGreska] = useState<string | null>(null);
+  // ─── Zamjena proizvoda ─────────────────────────────────────────────────────
+  const [artikli, setArtikli] = useState<ArtikalOption[]>([]);
+  const [artikliGrupe, setArtikliGrupe] = useState<ArtikalGrupa[]>([]);
+  const [zamjenaModal, setZamjenaModal] = useState<{
+    key: string;
+    sifraTabele?: number;
+    sifraTerenaDostava: number;
+    sifraPartnera: number;
+    sifraProizvodaStaro: string;
+    nazivProizvodaStaro: string;
+    jmStaro: string;
+  } | null>(null);
+  const [zamjenaKandidat, setZamjenaKandidat] = useState<ArtikalOption | null>(null);
+  const [zamjenaSaving, setZamjenaSaving] = useState(false);
+  const [zamjenaGreska, setZamjenaGreska] = useState<string | null>(null);
   // ─── Reorder (samo Android) ───────────────────────────────────────────────
   const [reorderMode, setReorderMode] = useState(false);
   const [kupacCustomOrder, setKupacCustomOrder] = useState<string[] | null>(null);
@@ -904,8 +921,111 @@ export function AktivneNarudzbe({ onBack }: Props) {
     }
   };
 
+  // ─── Dohvat pune liste artikala (za zamjenu proizvoda) ─────────────────────
+  // Učitava se jednom, pri ulasku u narudžbe, da klik na olovčicu bude trenutan.
+  const fetchArtikli = async () => {
+    try {
+      const [artikliRes, grupeRes] = await Promise.all([
+        apiFetch(`${API_URL}/api/artikli`),
+        apiFetch(`${API_URL}/api/artikli/grupe`),
+      ]);
+      const artikliData = await artikliRes.json();
+      if (artikliData.success && Array.isArray(artikliData.data)) {
+        setArtikli(
+          artikliData.data.map((a: {
+            sifra_proizvoda: string;
+            naziv_proizvoda: string;
+            jm: string;
+            grupa_proizvoda?: string;
+            kolicina_proizvoda?: number;
+          }) => ({
+            sifra_proizvoda: a.sifra_proizvoda,
+            naziv_proizvoda: a.naziv_proizvoda,
+            jm: a.jm,
+            grupa_proizvoda: a.grupa_proizvoda,
+            kolicina_proizvoda: a.kolicina_proizvoda != null ? Number(a.kolicina_proizvoda) : undefined,
+          })),
+        );
+      }
+      const grupeData = await grupeRes.json();
+      if (grupeData.success && Array.isArray(grupeData.data)) {
+        setArtikliGrupe(
+          grupeData.data.map((g: { grupa_proizvoda: string; naziv_grupe: string }) => ({
+            grupa_proizvoda: g.grupa_proizvoda,
+            naziv_grupe: g.naziv_grupe,
+          })),
+        );
+      }
+    } catch (error) {
+      console.error("Greška pri učitavanju artikala:", error);
+    }
+  };
+
+  const handleOdaberiZamjenu = (artikal: ArtikalOption) => {
+    setZamjenaGreska(null);
+    setZamjenaKandidat(artikal);
+  };
+
+  const closeZamjena = () => {
+    setZamjenaModal(null);
+    setZamjenaKandidat(null);
+    setZamjenaGreska(null);
+  };
+
+  const handlePotvrdiZamjenu = async () => {
+    if (!zamjenaModal || !zamjenaKandidat) return;
+    if (!zamjenaModal.sifraTabele) {
+      setZamjenaGreska("Nedostaje šifra tabele za ovu stavku");
+      return;
+    }
+    setZamjenaSaving(true);
+    setZamjenaGreska(null);
+    try {
+      const res = await apiFetch(`${API_URL}/api/aktivne-narudzbe-teren/zamjena-proizvoda`, {
+        method: "POST",
+        body: JSON.stringify({
+          sifraTabeleOriginal: zamjenaModal.sifraTabele,
+          sifraTerenaDostava: zamjenaModal.sifraTerenaDostava,
+          sifraPartnera: zamjenaModal.sifraPartnera,
+          sifraProizvodaStaro: zamjenaModal.sifraProizvodaStaro,
+          nazivProizvodaStaro: zamjenaModal.nazivProizvodaStaro,
+          jmStaro: zamjenaModal.jmStaro,
+          sifraProizvodaNovo: zamjenaKandidat.sifra_proizvoda,
+          nazivProizvodaNovo: zamjenaKandidat.naziv_proizvoda,
+          jmNovo: zamjenaKandidat.jm,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.message || "Zamjena proizvoda nije uspjela");
+      }
+      const { key } = zamjenaModal;
+      setNarudzbePoKupcu((prev) =>
+        prev.map((k) => ({
+          ...k,
+          proizvodi: k.proizvodi.map((p, idx) =>
+            rowKey(getKupacGroupingKey(k.sifra_kupca, k.referentni_broj), p.sif, idx) === key
+              ? {
+                  ...p,
+                  sif: zamjenaKandidat.sifra_proizvoda,
+                  naziv_proizvoda: zamjenaKandidat.naziv_proizvoda,
+                  jm: zamjenaKandidat.jm,
+                }
+              : p,
+          ),
+        })),
+      );
+      closeZamjena();
+    } catch (err) {
+      setZamjenaGreska(err instanceof Error ? err.message : "Greška pri zamjeni proizvoda");
+    } finally {
+      setZamjenaSaving(false);
+    }
+  };
+
   useEffect(() => {
     fetchTerenPoDanima();
+    fetchArtikli();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1693,37 +1813,71 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                           }}
                                         >
                                           <td className="px-6 py-4 text-sm text-gray-900 align-top">
-                                            <div>
-                                              {proizvod.naziv_proizvoda}
-                                              <span className="text-xs font-bold ml-1" style={{ color: PRIMARY }}>({proizvod.jm})</span>
-                                              {verNivo === 1 && (
-                                                <span
-                                                  className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase"
-                                                  style={{ background: "#ef444422", color: "#ef4444" }}
-                                                >
-                                                  Verifikovano
-                                                </span>
-                                              )}
-                                              {verNivo === 2 && (
-                                                <span
-                                                  className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded"
-                                                  style={{ background: "rgb(229 231 235)", color: "rgb(107 114 128)" }}
-                                                >
-                                                  <Lock className="w-2.5 h-2.5" />
-                                                </span>
-                                              )}
-                                            </div>
-                                            {proizvod.napomena &&
-                                              proizvod.napomena.trim() &&
-                                              proizvod.napomena.trim() !==
-                                                "-" && (
-                                                <div
-                                                  className="mt-1 text-xs italic"
-                                                  style={{ color: SECONDARY }}
-                                                >
-                                                  {proizvod.napomena.trim()}
+                                            <div className="flex items-start gap-2">
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  if (jeVerifikovan) return;
+                                                  setZamjenaGreska(null);
+                                                  setZamjenaKandidat(null);
+                                                  setZamjenaModal({
+                                                    key,
+                                                    sifraTabele: proizvod.sifra_tabele,
+                                                    sifraTerenaDostava: selectedDay ?? 0,
+                                                    sifraPartnera: kupac.sifra_kupca,
+                                                    sifraProizvodaStaro: proizvod.sif,
+                                                    nazivProizvodaStaro: proizvod.naziv_proizvoda,
+                                                    jmStaro: proizvod.jm,
+                                                  });
+                                                }}
+                                                disabled={jeVerifikovan}
+                                                className="flex-none rounded-lg transition-all"
+                                                style={{
+                                                  padding: isAndroid ? "0.4rem" : "0.3rem",
+                                                  backgroundColor: `${PRIMARY}10`,
+                                                  color: jeVerifikovan ? "rgb(156 163 175)" : PRIMARY,
+                                                  opacity: jeVerifikovan ? 0.4 : 1,
+                                                  cursor: jeVerifikovan ? "default" : "pointer",
+                                                }}
+                                                title={jeZakljucan ? "Zaključano — zamjena nije moguća" : jeVerifikovan ? "Verificirano — zamjena nije moguća" : "Zamijeni proizvod"}
+                                              >
+                                                <Pencil className={isAndroid ? "w-5 h-5" : "w-4 h-4"} />
+                                              </button>
+                                              <div>
+                                                <div>
+                                                  {proizvod.naziv_proizvoda}
+                                                  <span className="text-xs font-bold ml-1" style={{ color: PRIMARY }}>({proizvod.jm})</span>
+                                                  {verNivo === 1 && (
+                                                    <span
+                                                      className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase"
+                                                      style={{ background: "#ef444422", color: "#ef4444" }}
+                                                    >
+                                                      Verifikovano
+                                                    </span>
+                                                  )}
+                                                  {verNivo === 2 && (
+                                                    <span
+                                                      className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded"
+                                                      style={{ background: "rgb(229 231 235)", color: "rgb(107 114 128)" }}
+                                                    >
+                                                      <Lock className="w-2.5 h-2.5" />
+                                                    </span>
+                                                  )}
                                                 </div>
-                                              )}
+                                                {proizvod.napomena &&
+                                                  proizvod.napomena.trim() &&
+                                                  proizvod.napomena.trim() !==
+                                                    "-" && (
+                                                    <div
+                                                      className="mt-1 text-xs italic"
+                                                      style={{ color: SECONDARY }}
+                                                    >
+                                                      {proizvod.napomena.trim()}
+                                                    </div>
+                                                  )}
+                                              </div>
+                                            </div>
                                           </td>
                                           <td
                                             className="px-2 py-4 whitespace-nowrap align-top text-center"
@@ -2506,6 +2660,66 @@ export function AktivneNarudzbe({ onBack }: Props) {
       )}
 
       {kalkulatorOpen && <KalkulatorModal onClose={() => setKalkulatorOpen(false)} />}
+
+      {zamjenaModal && !zamjenaKandidat && (
+        <ZamjenaProizvodaModal
+          artikli={artikli}
+          grupe={artikliGrupe}
+          trenutniNaziv={zamjenaModal.nazivProizvodaStaro}
+          onSelect={handleOdaberiZamjenu}
+          onClose={closeZamjena}
+        />
+      )}
+
+      {/* ─── Modal: potvrda zamjene proizvoda ────────────────────────────────── */}
+      {zamjenaModal && zamjenaKandidat && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 flex flex-col gap-4 w-full max-w-sm">
+            <p className="text-base font-bold text-center" style={{ color: PRIMARY }}>
+              Potvrda zamjene proizvoda
+            </p>
+            <div className="flex flex-col gap-2">
+              <div className="rounded-xl p-3" style={{ backgroundColor: "rgb(254 242 242)" }}>
+                <div className="text-[10px] font-bold uppercase text-red-500 mb-1">Trenutni proizvod</div>
+                <div className="font-semibold text-gray-900">{zamjenaModal.nazivProizvodaStaro}</div>
+                <div className="text-xs text-gray-500">
+                  Šifra: {zamjenaModal.sifraProizvodaStaro} · JM: {zamjenaModal.jmStaro}
+                </div>
+              </div>
+              <div className="rounded-xl p-3" style={{ backgroundColor: `${SECONDARY}15` }}>
+                <div className="text-[10px] font-bold uppercase mb-1" style={{ color: SECONDARY }}>
+                  Novi proizvod
+                </div>
+                <div className="font-semibold text-gray-900">{zamjenaKandidat.naziv_proizvoda}</div>
+                <div className="text-xs text-gray-500">
+                  Šifra: {zamjenaKandidat.sifra_proizvoda} · JM: {zamjenaKandidat.jm}
+                </div>
+              </div>
+            </div>
+            {zamjenaGreska && (
+              <div className="text-xs font-semibold text-center text-red-600">{zamjenaGreska}</div>
+            )}
+            <div className="flex gap-3">
+              <button
+                disabled={zamjenaSaving}
+                className="flex-1 py-3 rounded-xl font-bold text-white transition-all active:scale-95 disabled:opacity-60"
+                style={{ backgroundColor: SECONDARY }}
+                onClick={handlePotvrdiZamjenu}
+              >
+                {zamjenaSaving ? "Snimanje..." : "Potvrdi zamjenu"}
+              </button>
+              <button
+                disabled={zamjenaSaving}
+                className="flex-1 py-3 rounded-xl font-bold transition-all active:scale-95 border-2 disabled:opacity-60"
+                style={{ color: PRIMARY, borderColor: PRIMARY }}
+                onClick={() => { setZamjenaKandidat(null); setZamjenaGreska(null); }}
+              >
+                Otkaži
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Modal: potvrda izmjene ──────────────────────────────────────────── */}
       {confirmKey !== null && (

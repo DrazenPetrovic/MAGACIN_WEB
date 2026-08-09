@@ -95,6 +95,19 @@ export const getArhiviraneNarudzbeGrupisano = async () => {
   });
 };
 
+// POST /api/aktivne-narudzbe-teren/zamjena-proizvoda
+// Zamjena proizvoda na stavci narudžbe koju vrši magacioner (npr. traženog artikla nema na stanju).
+// Upisuje i stari i novi proizvod radi revizije (ko je i čime zamijenio).
+export const zamijeniProizvod = async (payload) => {
+  return withConnection(async (connection) => {
+    const [rows] = await connection.execute(
+      "CALL erp.sp_dostava_proizvoda_izmjene_magacin(?)",
+      [JSON.stringify(payload)],
+    );
+    return Array.isArray(rows) && rows.length > 0 ? rows[0][0] : null;
+  });
+};
+
 // POST /api/aktivne-narudzbe-teren/verifikacija
 // Vrši verifikaciju (ili zaključavanje) grupe stavki (svi isti kupac ili svi isti proizvod).
 // verifikovano: 0 = poništi, 1 = verifikovano, 2 = zaključano.
