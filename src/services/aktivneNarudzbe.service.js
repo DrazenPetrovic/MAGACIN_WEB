@@ -100,10 +100,15 @@ export const getArhiviraneNarudzbeGrupisano = async () => {
 // Upisuje i stari i novi proizvod radi revizije (ko je i čime zamijenio).
 export const zamijeniProizvod = async (payload) => {
   return withConnection(async (connection) => {
+    const jsonParam = JSON.stringify([payload]);
+    // DEBUG: privremeno — ispis tačnog JSON-a koji se šalje u proceduru.
+    // TODO: ukloniti nakon što se otkrije uzrok greške "Nijedna promjena nije sačuvana".
+    console.log('[zamijeniProizvod] JSON param za sp_dostava_proizvoda_izmjene_magacin:', jsonParam);
     const [rows] = await connection.execute(
       "CALL erp.sp_dostava_proizvoda_izmjene_magacin(?)",
-      [JSON.stringify([payload])],
+      [jsonParam],
     );
+    console.log('[zamijeniProizvod] rezultat procedure:', JSON.stringify(rows));
     return Array.isArray(rows) && rows.length > 0 ? rows[0][0] : null;
   });
 };

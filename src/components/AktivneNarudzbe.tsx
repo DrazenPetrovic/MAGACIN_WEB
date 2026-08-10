@@ -981,19 +981,53 @@ export function AktivneNarudzbe({ onBack }: Props) {
     setZamjenaSaving(true);
     setZamjenaGreska(null);
     try {
+      const zamjenaPayload = {
+        sifraTabeleOriginal: zamjenaModal.sifraTabele,
+        sifraTerenaDostava: zamjenaModal.sifraTerenaDostava,
+        sifraPartnera: zamjenaModal.sifraPartnera,
+        sifraProizvodaStaro: zamjenaModal.sifraProizvodaStaro,
+        nazivProizvodaStaro: zamjenaModal.nazivProizvodaStaro,
+        jmStaro: zamjenaModal.jmStaro,
+        sifraProizvodaNovo: zamjenaKandidat.sifra_proizvoda,
+        nazivProizvodaNovo: zamjenaKandidat.naziv_proizvoda,
+        jmNovo: zamjenaKandidat.jm,
+      };
+
+      // DEBUG: privremeno — automatski preuzmi JSON koji se šalje, da se vidi
+      // tačan payload prije nego stigne greška "Nijedna promjena nije sačuvana".
+      // Imena polja ovdje su namjerno identična kolonama u bazi (onako kako
+      // service.js zaista šalje proceduri), ne camelCase iz HTTP zahtjeva.
+      // TODO: ukloniti nakon što se otkrije uzrok greške.
+      try {
+        const zamjenaPayloadDebug = {
+          sifra_tabele_original: zamjenaPayload.sifraTabeleOriginal,
+          sifra_terena_dostava: zamjenaPayload.sifraTerenaDostava,
+          sifra_partnera: zamjenaPayload.sifraPartnera,
+          sifra_proizvoda_staro: zamjenaPayload.sifraProizvodaStaro,
+          naziv_proizvoda_staro: zamjenaPayload.nazivProizvodaStaro,
+          jm_staro: zamjenaPayload.jmStaro,
+          sifra_proizvoda_novo: zamjenaPayload.sifraProizvodaNovo,
+          naziv_proizvoda_novo: zamjenaPayload.nazivProizvodaNovo,
+          jm_novo: zamjenaPayload.jmNovo,
+        };
+        const blob = new Blob([JSON.stringify(zamjenaPayloadDebug, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `zamjena-proizvoda-debug-${Date.now()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (debugErr) {
+        console.error("Debug download greška:", debugErr);
+      }
+
       const res = await apiFetch(`${API_URL}/api/aktivne-narudzbe-teren/zamjena-proizvoda`, {
         method: "POST",
-        body: JSON.stringify({
-          sifraTabeleOriginal: zamjenaModal.sifraTabele,
-          sifraTerenaDostava: zamjenaModal.sifraTerenaDostava,
-          sifraPartnera: zamjenaModal.sifraPartnera,
-          sifraProizvodaStaro: zamjenaModal.sifraProizvodaStaro,
-          nazivProizvodaStaro: zamjenaModal.nazivProizvodaStaro,
-          jmStaro: zamjenaModal.jmStaro,
-          sifraProizvodaNovo: zamjenaKandidat.sifra_proizvoda,
-          nazivProizvodaNovo: zamjenaKandidat.naziv_proizvoda,
-          jmNovo: zamjenaKandidat.jm,
-        }),
+        body: JSON.stringify(zamjenaPayload),
       });
       const data = await res.json();
       if (!data.success) {

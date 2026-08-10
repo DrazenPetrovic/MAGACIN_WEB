@@ -17,7 +17,8 @@
       "Bash(wsl ls *)",
       "Bash(echo \"exit:$?\")",
       "Bash(node check_grupe_tmp.mjs)",
-      "Bash(node check_sp_tmp.mjs)"
+      "Bash(node check_sp_tmp.mjs)",
+      "Bash(node _debug_inspect_proc.mjs)"
     ],
     "additionalDirectories": [
       "d:\\WEB_KOMERCIJALA\\MAGACIN_WEB\\public\\foto"
