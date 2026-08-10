@@ -32,14 +32,20 @@ export function ZamjenaProizvodaModal({ artikli, grupe, trenutniNaziv, onSelect,
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return artikli.filter((a) => {
-      if (grupaFilter && a.grupa_proizvoda !== grupaFilter) return false;
-      if (!q) return true;
-      return (
-        a.naziv_proizvoda.toLowerCase().includes(q) ||
-        a.sifra_proizvoda.toLowerCase().includes(q)
-      );
-    });
+    return artikli
+      .filter((a) => {
+        if (grupaFilter && a.grupa_proizvoda !== grupaFilter) return false;
+        if (!q) return true;
+        return (
+          a.naziv_proizvoda.toLowerCase().includes(q) ||
+          a.sifra_proizvoda.toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => {
+        const aNemaNaStanju = (a.kolicina_proizvoda ?? 0) === 0;
+        const bNemaNaStanju = (b.kolicina_proizvoda ?? 0) === 0;
+        return Number(aNemaNaStanju) - Number(bNemaNaStanju);
+      });
   }, [artikli, query, grupaFilter]);
 
   return (

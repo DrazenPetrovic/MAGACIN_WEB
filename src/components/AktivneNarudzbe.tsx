@@ -950,8 +950,8 @@ export function AktivneNarudzbe({ onBack }: Props) {
       const grupeData = await grupeRes.json();
       if (grupeData.success && Array.isArray(grupeData.data)) {
         setArtikliGrupe(
-          grupeData.data.map((g: { grupa_proizvoda: string; naziv_grupe: string }) => ({
-            grupa_proizvoda: g.grupa_proizvoda,
+          grupeData.data.map((g: { sifra_grupe: number; naziv_grupe: string }) => ({
+            grupa_proizvoda: String(g.sifra_grupe),
             naziv_grupe: g.naziv_grupe,
           })),
         );

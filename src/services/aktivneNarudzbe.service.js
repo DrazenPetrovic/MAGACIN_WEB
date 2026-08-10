@@ -102,7 +102,7 @@ export const zamijeniProizvod = async (payload) => {
   return withConnection(async (connection) => {
     const [rows] = await connection.execute(
       "CALL erp.sp_dostava_proizvoda_izmjene_magacin(?)",
-      [JSON.stringify(payload)],
+      [JSON.stringify([payload])],
     );
     return Array.isArray(rows) && rows.length > 0 ? rows[0][0] : null;
   });

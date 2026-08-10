@@ -136,7 +136,7 @@ export const zamijeniProizvod = async (req, res) => {
       jm_novo: jmNovo,
     });
 
-    if (result && Number(result.success) === 1) {
+    if (result && Number(result.uspjesno) === 1) {
       return res.json({ success: true, data: result });
     }
     return res.status(400).json({ success: false, message: result?.poruka || 'Zamjena proizvoda nije uspjela' });
