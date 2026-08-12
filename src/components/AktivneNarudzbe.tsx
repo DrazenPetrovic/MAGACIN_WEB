@@ -988,7 +988,7 @@ export function AktivneNarudzbe({ onBack }: Props) {
         sifraProizvodaStaro: zamjenaModal.sifraProizvodaStaro,
         nazivProizvodaStaro: zamjenaModal.nazivProizvodaStaro,
         jmStaro: zamjenaModal.jmStaro,
-        sifraProizvodaNovo: zamjenaKandidat.sifra_proizvoda,
+        sifraProizvodaNovo: Number(zamjenaKandidat.sifra_proizvoda),
         nazivProizvodaNovo: zamjenaKandidat.naziv_proizvoda,
         jmNovo: zamjenaKandidat.jm,
       };
@@ -1852,7 +1852,12 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                 type="button"
                                                 onClick={(e) => {
                                                   e.stopPropagation();
-                                                  if (jeVerifikovan) return;
+                                                  if (jeZakljucan) return;
+                                                  if (verNivo === 1) {
+                                                    setVerifikacijaGreska("Za ovaj proizvod je već spremljena roba — zamjena nije moguća.");
+                                                    setTimeout(() => setVerifikacijaGreska(null), 4000);
+                                                    return;
+                                                  }
                                                   setZamjenaGreska(null);
                                                   setZamjenaKandidat(null);
                                                   setZamjenaModal({
@@ -1865,16 +1870,16 @@ export function AktivneNarudzbe({ onBack }: Props) {
                                                     jmStaro: proizvod.jm,
                                                   });
                                                 }}
-                                                disabled={jeVerifikovan}
+                                                disabled={jeZakljucan}
                                                 className="flex-none rounded-lg transition-all"
                                                 style={{
                                                   padding: isAndroid ? "0.4rem" : "0.3rem",
                                                   backgroundColor: `${PRIMARY}10`,
                                                   color: jeVerifikovan ? "rgb(156 163 175)" : PRIMARY,
                                                   opacity: jeVerifikovan ? 0.4 : 1,
-                                                  cursor: jeVerifikovan ? "default" : "pointer",
+                                                  cursor: jeZakljucan ? "default" : "pointer",
                                                 }}
-                                                title={jeZakljucan ? "Zaključano — zamjena nije moguća" : jeVerifikovan ? "Verificirano — zamjena nije moguća" : "Zamijeni proizvod"}
+                                                title={jeZakljucan ? "Zaključano — zamjena nije moguća" : verNivo === 1 ? "Roba je već spremljena — zamjena nije moguća" : "Zamijeni proizvod"}
                                               >
                                                 <Pencil className={isAndroid ? "w-5 h-5" : "w-4 h-4"} />
                                               </button>
